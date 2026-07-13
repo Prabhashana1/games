@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="si">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sumudu & Sasindi - Food Catcher 🥘</title>
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+    <style>
+        :root {
+            --primary: #ff6b6b;
+            --bg-color: #ffeaa7;
+            --card-bg: #ffffff;
+        }
+        
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px 10px;
+            overflow: hidden;
+        }
+
+        h2 { color: #d63031; margin-bottom: 10px; text-shadow: 1px 1px 2px rgba(0,0,0,0.1); }
+        
+        .card {
+            background: var(--card-bg);
+            padding: 25px;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+        }
+
+        #game-screen { display: none; }
+
+        input {
+            padding: 12px;
+            width: 90%;
+            margin: 15px 0;
+            border: 2px solid #fab1a0;
+            border-radius: 10px;
+            font-size: 16px;
+            outline: none;
+            transition: border 0.3s;
+        }
+        input:focus { border-color: var(--primary); }
+
+        .btn {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 18px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 5px 15px rgba(255, 107, 107, 0.4);
+            transition: transform 0.1s, box-shadow 0.1s;
+            width: 90%;
+        }
+        .btn:active { transform: translateY(2px); box-shadow: 0 2px 10px rgba(255, 107, 107, 0.4); }
+
+        .id-box {
+            background: #ff7675;
+            color: white;
+            padding: 12px;
+            border-radius: 10px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            margin-bottom: 20px;
+            word-wrap: break-word;
+            font-size: 18px;
+        }
+
+        /* Score Board */
+        .scoreboard {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 20px;
+            margin-bottom: 25px;
+            padding: 15px;
+            background: #fff3e0;
+            border-radius: 15px;
+            border: 2px dashed #ffb8b8;
+        }
+        .sasindi-score { color: #d63031; }
+        .sumudu-score { color: #0984e3; }
+
+        /* Whack-a-mole Grid */
+        #grid-container {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin: 0 auto;
+        }
+
+        .plate {
+            background-color: #f1f2f6;
+            border-radius: 50%;
+            aspect-ratio: 1 / 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 45px;
+            cursor: pointer;
+            box-shadow: inset 0 -6px 0 rgba(0,0,0,0.05), 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.1s;
+            position: relative;
+        }
+
+        .plate:active { transform: scale(0.9); }
+
+        /* Animation for food appearing */
+        @keyframes popIn {
+            0% { transform: scale(0); opacity: 0; }
+            80% { transform: scale(1.2); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .food-item {
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            pointer-events: none; /* Let clicks pass to the plate */
+        }
+
+        #game-over-msg {
+            font-size: 22px;
+            font-weight: bold;
+            margin-top: 25px;
+            color: #00b894;
+            animation: popIn 0.5s;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Setup Screen -->
+    <div class="card" id="setup-screen">
+        <h2>කෑම පෙරේතයා කවුද? 🍲</h2>
+        <p style="color: #636e72; font-size: 14px; margin-bottom: 20px;">
+            පොලොස්, පරිප්පු, වට්ටක්කා මතු වෙනකොටම ඉක්මනට ඔබන්න! ලකුණු 20 ක් ගන්න කෙනා දිනුම්.
+        </p>
+        
+        <p style="font-weight: bold; color: #2d3436;">ඔයාගේ Game ID එක:</p>
+        <div class="id-box" id="my-id">⏳ Generating...</div>
+        
+        <p style="font-weight: bold; color: #2d3436; margin-top: 10px;">හෝ අනිත් කෙනාගේ ID එක දෙන්න:</p>
+        <input type="text" id="partner-id" placeholder="ID එක මෙතනට Paste කරන්න">
+        
+        <button class="btn" id="connect-btn">සම්බන්ධ වෙන්න 🚀</button>
+        <p id="status-msg" style="color: #e17055; font-size: 14px; margin-top: 15px; font-weight: bold;"></p>
+    </div>
+
+    <!-- Game Screen -->
+    <div class="card" id="game-screen">
+        <h2>කෑම එකතු කරමු! 🍽️</h2>
+        
+        <div class="scoreboard">
+            <div class="sasindi-score">සසින්දි: <span id="score-sasindi">0</span></div>
+            <div class="sumudu-score">සුමුදු: <span id="score-sumudu">0</span></div>
+        </div>
+
+        <div id="grid-container">
+            <!-- 9 Plates -->
+            <div class="plate" data-index="0"></div>
+            <div class="plate" data-index="1"></div>
+            <div class="plate" data-index="2"></div>
+            <div class="plate" data-index="3"></div>
+            <div class="plate" data-index="4"></div>
+            <div class="plate" data-index="5"></div>
+            <div class="plate" data-index="6"></div>
+            <div class="plate" data-index="7"></div>
+            <div class="plate" data-index="8"></div>
+        </div>
+
+        <div id="game-over-msg"></div>
+    </div>
+
+    <script>
+        // Best Practice: Strict state management to avoid object serialization errors
+        const peer = new Peer();
+        let conn = null;
+        let myPlayerName = ''; 
+        let scores = { sumudu: 0, sasindi: 0 };
+        let gameActive = false;
+        let hostLoop = null;
+
+        const DOM = {
+            setup: document.getElementById('setup-screen'),
+            game: document.getElementById('game-screen'),
+            status: document.getElementById('status-msg'),
+            myId: document.getElementById('my-id'),
+            partnerId: document.getElementById('partner-id'),
+            connectBtn: document.getElementById('connect-btn'),
+            plates: document.querySelectorAll('.plate'),
+            scoreSasindi: document.getElementById('score-sasindi'),
+            scoreSumudu: document.getElementById('score-sumudu'),
+            gameOverMsg: document.getElementById('game-over-msg')
+        };
+
+        // Initialize Peer
+        peer.on('open', (id) => {
+            DOM.myId.innerText = id;
+        });
+
+        // I am the Host
+        peer.on('connection', (c) => {
+            conn = c;
+            myPlayerName = 'sumudu';
+            DOM.status.innerText = "සසින්දි සම්බන්ධ වෙමින් පවතී...";
+            
+            conn.on('open', () => {
+                DOM.status.innerText = "සම්බන්ධ වුණා! ගේම් එක ලෝඩ් වෙනවා...";
+                setTimeout(startGameHost, 1500);
+            });
+        });
+
+        // I am the Client
+        DOM.connectBtn.onclick = () => {
+            const pid = DOM.partnerId.value.trim();
+            if(!pid) return alert("කරුණාකර ID එක ඇතුළත් කරන්න!");
+            
+            DOM.status.innerText = "සුමුදුට සම්බන්ධ වෙමින් පවතී...";
+            conn = peer.connect(pid, { reliable: true });
+            myPlayerName = 'sasindi';
+            
+            conn.on('open', () => {
+                DOM.status.innerText = "සම්බන්ධ වුණා! ගේම් එක ලෝඩ් වෙනවා...";
+                setupGameClient();
+            });
+        };
+
+        function setupGameClient() {
+            conn.on('data', handleNetworkData);
+        }
+
+        function startGameHost() {
+            gameActive = true;
+            conn.on('data', handleNetworkData);
+            
+            // Tell client to show game screen
+            conn.send({ type: 'start' });
+            showGameScreen();
+
+            // Game Loop: Spawn food every 900ms
+            hostLoop = setInterval(() => {
+                if(!gameActive) return clearInterval(hostLoop);
+                
+                const foods = ['🥘', '🍛', '🍆', '🎃', '🥒'];
+                const randomFood = foods[Math.floor(Math.random() * foods.length)];
+                
+                // Find empty plates
+                const emptyPlates = Array.from(DOM.plates).filter(p => p.innerHTML === '');
+                if(emptyPlates.length === 0) return;
+                
+                const randomPlate = emptyPlates[Math.floor(Math.random() * emptyPlates.length)];
+                const index = randomPlate.dataset.index;
+
+                // Send spawn command
+                const data = { type: 'spawn', index: index, food: randomFood };
+                handleNetworkData(data); // Render locally
+                conn.send(data); // Send to partner
+
+                // Auto-clear after 800ms if not clicked
+                setTimeout(() => {
+                    if (randomPlate.innerHTML.includes(randomFood) && gameActive) {
+                        const clearData = { type: 'clear', index: index };
+                        handleNetworkData(clearData);
+                        conn.send(clearData);
+                    }
+                }, 800);
+
+            }, 900);
+        }
+
+        // Centralized Network Data Handler (Safeguards against DOM errors)
+        function handleNetworkData(data) {
+            if (data.type === 'start') {
+                showGameScreen();
+            } 
+            else if (data.type === 'spawn') {
+                const plate = DOM.plates[data.index];
+                plate.innerHTML = `<div class="food-item">${data.food}</div>`;
+            }
+            else if (data.type === 'clear') {
+                DOM.plates[data.index].innerHTML = '';
+            }
+            else if (data.type === 'score') {
+                scores = data.scores;
+                DOM.scoreSasindi.innerText = scores.sasindi;
+                DOM.scoreSumudu.innerText = scores.sumudu;
+                DOM.plates[data.index].innerHTML = ''; // Clear the plate that was tapped
+                
+                if (scores.sumudu >= 20 || scores.sasindi >= 20) {
+                    endGame();
+                }
+            }
+            // Host strictly handles taps to prevent cheating/race conditions
+            else if (data.type === 'tap_request' && myPlayerName === 'sumudu' && gameActive) {
+                const plate = DOM.plates[data.index];
+                if (plate.innerHTML !== '') {
+                    scores[data.player]++;
+                    const scoreData = { type: 'score', scores: scores, index: data.index };
+                    handleNetworkData(scoreData); // Update locally
+                    conn.send(scoreData); // Broadcast
+                }
+            }
+        }
+
+        function showGameScreen() {
+            DOM.setup.style.display = 'none';
+            DOM.game.style.display = 'block';
+            
+            // Add click listeners to plates
+            DOM.plates.forEach(plate => {
+                plate.onclick = () => {
+                    if(!gameActive || plate.innerHTML === '') return;
+                    
+                    if (myPlayerName === 'sumudu') {
+                        // Host handles its own tap
+                        handleNetworkData({ type: 'tap_request', index: plate.dataset.index, player: 'sumudu' });
+                    } else {
+                        // Client requests host to verify tap
+                        conn.send({ type: 'tap_request', index: plate.dataset.index, player: 'sasindi' });
+                    }
+                };
+            });
+        }
+
+        function endGame() {
+            gameActive = false;
+            if (hostLoop) clearInterval(hostLoop);
+            DOM.plates.forEach(p => p.innerHTML = ''); // Clear board
+            
+            if (scores.sumudu > scores.sasindi) {
+                DOM.gameOverMsg.innerText = "🎉 සුමුදු දිනුම්! ඔයා තමයි කෑම පෙරේතයා! 🤣";
+            } else if (scores.sasindi > scores.sumudu) {
+                DOM.gameOverMsg.innerText = "🎉 සසින්දි දිනුම්! සසින්දි තමයි කෑම පෙරේතයා! 🤣";
+            } else {
+                DOM.gameOverMsg.innerText = "🤝 දෙන්නම දිනුම්!";
+            }
+        }
+    </script>
+</body>
+</html>
