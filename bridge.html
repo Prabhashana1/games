@@ -4,88 +4,77 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Sumudu & Sasindi - Bridge of Love 🌉</title>
-    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+    <!-- PeerJS වෙනුවට වඩාත් සාර්ථක MQTT තාක්ෂණය -->
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
     <style>
         :root { --primary: #e74c3c; --wood: #d35400; --water: #2980b9; }
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; font-family: 'Segoe UI', Tahoma, sans-serif; }
         
         body { background-color: #ecf0f1; text-align: center; display: flex; flex-direction: column; align-items: center; min-height: 100vh; overflow: hidden; }
 
-        /* Setup Screen */
         #setup-screen { background: white; padding: 30px 20px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); max-width: 400px; width: 95%; margin-top: 50px; z-index: 10; }
         h2 { color: var(--primary); margin-bottom: 10px; }
         .id-box { background: #fadbd8; color: #c0392b; padding: 12px; border-radius: 10px; font-weight: bold; font-size: 18px; letter-spacing: 2px; margin: 15px 0; word-wrap: break-word; }
-        input { padding: 12px; width: 90%; margin: 10px 0; border: 2px solid #f5b7b1; border-radius: 10px; font-size: 16px; outline: none; }
+        input { padding: 12px; width: 90%; margin: 10px 0; border: 2px solid #f5b7b1; border-radius: 10px; font-size: 16px; outline: none; text-align: center; }
         .btn { background-color: var(--primary); color: white; border: none; padding: 15px 30px; font-size: 18px; border-radius: 30px; cursor: pointer; font-weight: bold; width: 90%; box-shadow: 0 5px 15px rgba(231, 76, 60, 0.4); margin-top: 10px; transition: 0.2s; }
         .btn:active { transform: scale(0.95); }
 
-        /* Game Screen */
         #game-screen { display: none; width: 100%; max-width: 500px; height: 100vh; flex-direction: column; background: var(--water); position: relative; }
         
-        /* River Background Animation */
         .river-bg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(0deg, #2980b9 0%, #3498db 50%, #2980b9 100%); background-size: 100% 200%; animation: flow 4s linear infinite; z-index: 1; }
         @keyframes flow { 0% { background-position: 0% 0%; } 100% { background-position: 0% 100%; } }
 
-        /* UI overlay */
         #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; }
         
         #top-info, #bottom-info { background: rgba(255,255,255,0.9); padding: 10px; font-weight: bold; text-align: center; font-size: 18px; box-shadow: 0 0 15px rgba(0,0,0,0.2); pointer-events: auto; }
         #top-info { border-bottom-left-radius: 15px; border-bottom-right-radius: 15px; color: #c0392b; }
         #bottom-info { border-top-left-radius: 15px; border-top-right-radius: 15px; color: #2980b9; }
 
-        /* Save Button Pulse Animation */
         .save-btn { display: none; background: #f1c40f; color: #d35400; border: none; padding: 12px 20px; font-size: 16px; border-radius: 25px; font-weight: bold; cursor: pointer; animation: pulse 1s infinite; box-shadow: 0 4px 15px rgba(241, 196, 15, 0.5); pointer-events: auto; margin-top: 5px; width: 100%; }
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
 
-        /* Bridge Grid */
         #bridge-container { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 5; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 85%; max-width: 350px; pointer-events: auto; }
         
         .plank { background: var(--wood); border: 2px solid #8b4513; border-radius: 8px; height: 7vh; max-height: 55px; display: flex; justify-content: center; align-items: center; font-size: 32px; box-shadow: 0 4px 0 #8b4513; cursor: pointer; transition: 0.2s; position: relative; }
         .plank:active { transform: translateY(4px); box-shadow: 0 0 0 #8b4513; }
         .plank.broken { background: transparent; border-color: rgba(255,255,255,0.2); box-shadow: none; cursor: default; }
         
-        /* Sinking animation */
         .sinking { animation: sink 0.5s forwards; }
         @keyframes sink { 0% { transform: scale(1) translateY(0); opacity: 1; } 100% { transform: scale(0.5) translateY(20px); opacity: 0.5; filter: blur(2px); } }
 
-        /* Game Over Screen */
         #game-over-screen { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 50px rgba(0,0,0,0.5); z-index: 100; width: 90%; max-width: 400px; text-align: center; }
     </style>
 </head>
 <body>
 
-    <!-- Setup Screen -->
     <div id="setup-screen">
         <h2>ආදර පාලම 🌉❤️</h2>
-        <p style="color: #7f8c8d; font-size: 14px; margin-bottom: 20px;">පාලම මැදින් මුණගැහෙන්න! කැඩුණු ලෑලි පෑගුවොත් අනිත් කෙනාට අත දීලා ගොඩගන්න වෙනවා.</p>
-        <div class="id-box" id="my-id">⏳ ID එක සෑදෙමින් පවතී...</div>
-        <input type="text" id="partner-id" placeholder="අනිත් කෙනාගේ ID එක Paste කරන්න">
+        <p style="color: #7f8c8d; font-size: 14px; margin-bottom: 20px;">පාලම මැදින් මුණගැහෙන්න! Cloud Server තාක්ෂණයෙන් දැන් කිසිම හිරවීමක් නැහැ.</p>
+        
+        <p style="font-weight: bold; margin-bottom: 5px;">ඔයාගේ Game ID එක:</p>
+        <div class="id-box" id="my-id">සම්බන්ධ වෙමින් පවතී...</div>
+        
+        <p style="font-weight: bold; margin-top: 15px;">හෝ අනිත් කෙනාගේ ID එක දෙන්න:</p>
+        <input type="text" id="partner-id" placeholder="ID එක මෙතනට Paste කරන්න">
         <button class="btn" id="connect-btn">සම්බන්ධ වෙන්න 🤝</button>
-        <p id="status-msg" style="color: #e67e22; font-size: 14px; margin-top: 15px; font-weight: bold;"></p>
+        <p id="status-msg" style="color: #27ae60; font-size: 14px; margin-top: 15px; font-weight: bold;"></p>
     </div>
 
-    <!-- Game Screen -->
     <div id="game-screen">
         <div class="river-bg"></div>
-        
         <div id="ui-layer">
             <div id="top-info">
                 👧🏻 සසින්දි
                 <button id="save-sumudu-btn" class="save-btn" onclick="sendSaveAction()">සුමුදුව ගොඩගන්න 🤝</button>
             </div>
-            
             <div id="bottom-info">
                 👦🏻 සුමුදු
                 <button id="save-sasindi-btn" class="save-btn" onclick="sendSaveAction()">සසින්දිව ගොඩගන්න 🤝</button>
             </div>
         </div>
-
-        <div id="bridge-container">
-            <!-- JavaScript will generate the 10x3 grid here -->
-        </div>
+        <div id="bridge-container"></div>
     </div>
 
-    <!-- Game Over Screen -->
     <div id="game-over-screen">
         <h1 style="color: var(--primary); margin-bottom: 20px;">🎉 දිනුම්!</h1>
         <p style="font-size: 16px; margin-bottom: 20px; color: #555;">ආදරේටයි, විශ්වාසයටයි එකතු වෙලා ඕනෑම පාලමක් තරණය කරන්න පුළුවන්! ❤️</p>
@@ -93,11 +82,11 @@
     </div>
 
     <script>
-        // --- 1. NETWORKING (PeerJS) ---
-        const peer = new Peer();
-        let conn = null;
-        let myRole = ''; // 'sumudu' (Host, Bottom) or 'sasindi' (Client, Top)
-
+        // --- MQTT Cloud Connection Setup (No NAT/Firewall issues) ---
+        const client = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
+        let myRole = 'sumudu'; // Default to Host
+        let gameTopic = 'sumudu_sasindi_lovebridge_' + Math.floor(Math.random() * 100000);
+        
         const DOM = {
             setup: document.getElementById('setup-screen'),
             game: document.getElementById('game-screen'),
@@ -111,59 +100,75 @@
             gameOver: document.getElementById('game-over-screen')
         };
 
-        peer.on('open', (id) => { DOM.myId.innerText = id; });
-
-        // Host (Sumudu)
-        peer.on('connection', (c) => {
-            conn = c; myRole = 'sumudu';
-            DOM.status.innerText = "සසින්දි සම්බන්ධ වෙමින් පවතී...";
-            c.on('open', () => {
-                DOM.status.innerText = "සම්බන්ධ වුණා! ගේම් එක පටන් ගන්නවා...";
-                setTimeout(() => { startGameHost(); }, 1000);
-            });
-            c.on('data', handleNetworkData);
+        // When connected to the Public Cloud Broker
+        client.on('connect', () => {
+            DOM.myId.innerText = gameTopic;
+            client.subscribe(gameTopic); // Subscribe to my own channel
+            DOM.status.innerText = "Cloud Server එකට සම්බන්ධයි ✅";
         });
 
-        // Client (Sasindi)
+        // Listen for incoming messages
+        client.on('message', (topic, message) => {
+            const msg = JSON.parse(message.toString());
+            // Ignore messages sent by ourselves
+            if (msg.sender === myRole) return; 
+            handleNetworkData(msg.payload);
+        });
+
+        // Function to send data through Cloud
+        function sendNetworkData(payload) {
+            client.publish(gameTopic, JSON.stringify({ sender: myRole, payload: payload }));
+        }
+
+        // Client (Sasindi) connects to Host (Sumudu)
         DOM.connectBtn.onclick = () => {
             const pid = DOM.partnerId.value.trim();
             if(!pid) return alert("කරුණාකර ID එකක් දෙන්න!");
-            DOM.status.innerText = "සුමුදුට සම්බන්ධ වෙමින් පවතී...";
-            conn = peer.connect(pid, { reliable: true });
-            myRole = 'sasindi';
             
-            conn.on('open', () => { DOM.status.innerText = "සම්බන්ධ වුණා! ගේම් එක පටන්ගන්නකම් ඉන්න..."; });
-            conn.on('data', handleNetworkData);
+            // Unsubscribe from old, subscribe to partner's topic
+            client.unsubscribe(gameTopic);
+            gameTopic = pid;
+            client.subscribe(gameTopic);
+            
+            myRole = 'sasindi';
+            DOM.status.innerText = "සුමුදුට සම්බන්ධ වෙමින් පවතී...";
+            
+            // Tell host we joined
+            sendNetworkData({ type: 'join' });
         };
 
-        // --- 2. GAME STATE (100% Host Authoritative to prevent bugs) ---
+        // --- GAME STATE ---
         let state = {
-            trapMap: [], // Array of 10 integers (0,1,2) representing broken block in each row
-            p1: { y: 9, x: 1, fallen: false }, // Sumudu (Starts at bottom row 9)
-            p2: { y: 0, x: 1, fallen: false }, // Sasindi (Starts at top row 0)
-            revealedTraps: [], // Store coordinates of triggered traps to keep them broken visually
+            trapMap: [], 
+            p1: { y: 9, x: 1, fallen: false }, 
+            p2: { y: 0, x: 1, fallen: false }, 
+            revealedTraps: [], 
             active: false
         };
 
         function startGameHost() {
             state.active = true;
-            // Generate Traps: for rows 1 to 8 (Start rows 0 and 9 are safe)
+            state.trapMap = [];
             for(let i=0; i<10; i++) {
-                if(i === 0 || i === 9) state.trapMap.push(-1); // No trap on start line
+                if(i === 0 || i === 9) state.trapMap.push(-1);
                 else state.trapMap.push(Math.floor(Math.random() * 3));
             }
-            conn.send({ type: 'start', state: state });
+            sendNetworkData({ type: 'start', state: state });
+            showGameScreen();
+        }
+
+        function showGameScreen() {
+            DOM.setup.style.display = 'none';
+            DOM.game.style.display = 'flex';
             renderBoard();
         }
 
-        // --- 3. INPUT HANDLING ---
         function handleTap(r, c) {
             if(!state.active) return;
-            // Send tap to Host for verification
             if(myRole === 'sumudu') {
                 handleHostLogic('sumudu', 'tap', {r, c});
             } else {
-                conn.send({ type: 'action', player: 'sasindi', action: 'tap', data: {r, c} });
+                sendNetworkData({ type: 'action', player: 'sasindi', action: 'tap', data: {r, c} });
             }
         }
 
@@ -172,22 +177,25 @@
             if(myRole === 'sumudu') {
                 handleHostLogic('sumudu', 'save', {});
             } else {
-                conn.send({ type: 'action', player: 'sasindi', action: 'save', data: {} });
+                sendNetworkData({ type: 'action', player: 'sasindi', action: 'save', data: {} });
             }
         }
 
-        // --- 4. HOST LOGIC CORE ---
         function handleNetworkData(data) {
-            if(data.type === 'start') {
+            if (data.type === 'join' && myRole === 'sumudu') {
+                // Sasindi joined, start the game!
+                DOM.status.innerText = "සසින්දි සම්බන්ධ වුණා! ගේම් එක පටන්ගන්නවා...";
+                setTimeout(() => { startGameHost(); }, 500);
+            } 
+            else if (data.type === 'start') {
                 state = data.state;
-                DOM.setup.style.display = 'none';
-                DOM.game.style.display = 'flex';
+                showGameScreen();
+            } 
+            else if (data.type === 'sync') {
+                state = data.state;
                 renderBoard();
-            } else if (data.type === 'sync') {
-                state = data.state; // Client strictly updates to Host's reality
-                renderBoard();
-            } else if (data.type === 'action' && myRole === 'sumudu') {
-                // Host processes client actions
+            } 
+            else if (data.type === 'action' && myRole === 'sumudu') {
                 handleHostLogic(data.player, data.action, data.data);
             }
         }
@@ -196,17 +204,11 @@
             let p = player === 'sumudu' ? state.p1 : state.p2;
             
             if (action === 'tap') {
-                if (p.fallen) return; // Cannot move if fallen
-                
-                // Validate move: Must be moving 1 step forward
+                if (p.fallen) return;
                 let validMove = (player === 'sumudu' && data.r === p.y - 1) || 
                                 (player === 'sasindi' && data.r === p.y + 1);
-                
                 if (validMove) {
-                    p.y = data.r;
-                    p.x = data.c;
-                    
-                    // Check if stepped on a trap
+                    p.y = data.r; p.x = data.c;
                     if (state.trapMap[data.r] === data.c) {
                         p.fallen = true;
                         state.revealedTraps.push(`${data.r}-${data.c}`);
@@ -214,63 +216,46 @@
                 }
             } 
             else if (action === 'save') {
-                // If I click save, I am saving the OTHER player
                 let otherP = player === 'sumudu' ? state.p2 : state.p1;
                 if(otherP.fallen) {
                     otherP.fallen = false;
-                    // Move them back one safe step
                     otherP.y = player === 'sumudu' ? otherP.y - 1 : otherP.y + 1;
                 }
             }
 
-            // Check Win Condition: Meet in the middle (Rows 4 & 5)
             if (!state.p1.fallen && !state.p2.fallen && state.p1.y === 5 && state.p2.y === 4) {
                 state.active = false;
-                conn.send({ type: 'sync', state: state });
-                setTimeout(() => {
-                    DOM.gameOver.style.display = 'block';
-                }, 1000);
+                sendNetworkData({ type: 'sync', state: state });
+                setTimeout(() => { DOM.gameOver.style.display = 'block'; }, 1000);
             }
 
-            // Broadcast new state
-            conn.send({ type: 'sync', state: state });
+            sendNetworkData({ type: 'sync', state: state });
             renderBoard();
         }
 
-        // --- 5. RENDER UI ---
         function renderBoard() {
-            DOM.bridge.innerHTML = ''; // Clear board
-            
-            // Generate 10 rows x 3 cols
+            DOM.bridge.innerHTML = ''; 
             for (let r = 0; r < 10; r++) {
                 for (let c = 0; c < 3; c++) {
                     let plank = document.createElement('div');
                     plank.className = 'plank';
                     
-                    // Check if this plank is a revealed broken trap
-                    if (state.revealedTraps.includes(`${r}-${c}`)) {
-                        plank.classList.add('broken');
-                    }
+                    if (state.revealedTraps.includes(`${r}-${c}`)) plank.classList.add('broken');
 
-                    // Check if Sasindi is here
                     if (state.p2.y === r && state.p2.x === c) {
                         plank.innerHTML = `<span class="${state.p2.fallen ? 'sinking' : ''}">👧🏻</span>`;
-                    }
-                    // Check if Sumudu is here
-                    else if (state.p1.y === r && state.p1.x === c) {
+                    } else if (state.p1.y === r && state.p1.x === c) {
                         plank.innerHTML = `<span class="${state.p1.fallen ? 'sinking' : ''}">👦🏻</span>`;
                     }
 
-                    // Only allow tapping the row directly in front of you
                     plank.onclick = () => handleTap(r, c);
                     DOM.bridge.appendChild(plank);
                 }
             }
 
-            // Manage Save Buttons (Client side UI)
             if (myRole === 'sumudu') {
                 DOM.saveSasindiBtn.style.display = state.p2.fallen ? 'block' : 'none';
-                DOM.saveSumuduBtn.style.display = 'none'; // Sumudu can't save himself
+                DOM.saveSumuduBtn.style.display = 'none'; 
             } else if (myRole === 'sasindi') {
                 DOM.saveSumuduBtn.style.display = state.p1.fallen ? 'block' : 'none';
                 DOM.saveSasindiBtn.style.display = 'none';
