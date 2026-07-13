@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="si">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sumudu & Sasindi - Love Journey ❤️</title>
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+    <style>
+        :root { --primary: #e74c3c; --bg: #fdf2e9; }
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Setup Screen */
+        #setup-screen {
+            background: white;
+            padding: 30px 20px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            max-width: 400px;
+            width: 95%;
+            margin-top: 50px;
+        }
+        
+        h2 { color: var(--primary); margin-bottom: 10px; }
+        
+        .id-box {
+            background: #fadbd8; color: #c0392b;
+            padding: 12px; border-radius: 10px;
+            font-weight: bold; font-size: 18px; letter-spacing: 2px;
+            margin: 15px 0; word-wrap: break-word;
+        }
+
+        input {
+            padding: 12px; width: 90%; margin: 10px 0;
+            border: 2px solid #f5b7b1; border-radius: 10px;
+            font-size: 16px; outline: none;
+        }
+
+        .btn {
+            background-color: var(--primary); color: white;
+            border: none; padding: 15px 30px;
+            font-size: 18px; border-radius: 30px;
+            cursor: pointer; font-weight: bold; width: 90%;
+            box-shadow: 0 5px 15px rgba(231, 76, 60, 0.4);
+            margin-top: 10px;
+        }
+        .btn:active { transform: scale(0.95); }
+
+        /* Game Screen */
+        #game-screen {
+            display: none;
+            width: 100%;
+            max-width: 600px;
+            height: 100vh;
+            flex-direction: column;
+        }
+
+        /* Top Info Bar */
+        #info-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #fff;
+            padding: 10px 20px;
+            font-weight: bold;
+            font-size: 18px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            z-index: 10;
+        }
+        #timer { color: #d35400; font-size: 22px; }
+        .score-box { background: #fdf2e9; padding: 5px 15px; border-radius: 20px; }
+
+        /* Canvas */
+        #gameCanvas {
+            flex-grow: 1;
+            width: 100%;
+            background-color: #7f8c8d; /* Road color */
+            display: block;
+        }
+
+        /* Mobile Controls */
+        #controls {
+            display: flex;
+            justify-content: space-between;
+            padding: 15px 20px;
+            background: #fff;
+            box-shadow: 0 -4px 10px rgba(0,0,0,0.1);
+        }
+        .ctrl-btn {
+            background: #34495e; color: white;
+            border: none; border-radius: 15px;
+            padding: 20px; font-size: 24px;
+            width: 45%; cursor: pointer;
+            box-shadow: 0 4px 0 #2c3e50;
+        }
+        .ctrl-btn:active { transform: translateY(4px); box-shadow: 0 0 0 #2c3e50; }
+
+        /* Game Over Screen */
+        #game-over-screen {
+            display: none;
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 50px rgba(0,0,0,0.5);
+            z-index: 100;
+            width: 90%;
+            max-width: 400px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Setup Screen -->
+    <div id="setup-screen">
+        <h2>ආදර ගමන ❤️🚗</h2>
+        <p style="color: #7f8c8d; font-size: 14px;">හාට් සහ බෝනස් කෑම (පොලොස්, පරිප්පු) එකතු කරන්න. බාධක වලින් බේරෙන්න!</p>
+        
+        <div class="id-box" id="my-id">⏳ ID එක සෑදෙමින් පවතී...</div>
+        
+        <p style="font-weight: bold; margin-top: 15px;">අනිත් කෙනාගේ ID එක මෙතනට දෙන්න:</p>
+        <input type="text" id="partner-id" placeholder="ID එක Paste කරන්න">
+        
+        <button class="btn" id="connect-btn">Connect & Play 🚀</button>
+        <p id="status-msg" style="color: #e67e22; font-size: 14px; margin-top: 15px; font-weight: bold;"></p>
+    </div>
+
+    <!-- Game Screen -->
+    <div id="game-screen">
+        <div id="info-bar">
+            <div class="score-box" style="color: #2980b9;">සුමුදු: <span id="score-sumudu">0</span></div>
+            <div id="timer">03:00</div>
+            <div class="score-box" style="color: #c0392b;">සසින්දි: <span id="score-sasindi">0</span></div>
+        </div>
+        
+        <canvas id="gameCanvas" width="600" height="800"></canvas>
+        
+        <div id="controls">
+            <button class="ctrl-btn" id="btn-left">◀ වමට</button>
+            <button class="ctrl-btn" id="btn-right">දකුණට ▶</button>
+        </div>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="game-over-screen">
+        <h1 id="winner-text" style="color: var(--primary); margin-bottom: 20px;"></h1>
+        <p style="font-size: 18px; margin-bottom: 10px;">සුමුදුගේ ලකුණු: <b id="final-sumudu">0</b></p>
+        <p style="font-size: 18px; margin-bottom: 20px;">සසින්දිගේ ලකුණු: <b id="final-sasindi">0</b></p>
+        <button class="btn" onclick="location.reload()">නැවත ප්ලේ කරන්න</button>
+    </div>
+
+    <script>
+        // --- PEER.JS CONNECTION LOGIC ---
+        const peer = new Peer();
+        let conn = null;
+        let myRole = ''; // 'sumudu' (host) or 'sasindi' (client)
+        let gameActive = false;
+
+        const DOM = {
+            setup: document.getElementById('setup-screen'),
+            game: document.getElementById('game-screen'),
+            status: document.getElementById('status-msg'),
+            myId: document.getElementById('my-id'),
+            partnerId: document.getElementById('partner-id'),
+            connectBtn: document.getElementById('connect-btn'),
+            scoreSumudu: document.getElementById('score-sumudu'),
+            scoreSasindi: document.getElementById('score-sasindi'),
+            timer: document.getElementById('timer'),
+            btnLeft: document.getElementById('btn-left'),
+            btnRight: document.getElementById('btn-right'),
+            gameOverScreen: document.getElementById('game-over-screen'),
+            winnerText: document.getElementById('winner-text'),
+            finalSumudu: document.getElementById('final-sumudu'),
+            finalSasindi: document.getElementById('final-sasindi')
+        };
+
+        peer.on('open', (id) => { DOM.myId.innerText = id; });
+
+        // Host (Sumudu)
+        peer.on('connection', (c) => {
+            conn = c;
+            myRole = 'sumudu';
+            DOM.status.innerText = "සසින්දි සම්බන්ධ වෙමින් පවතී...";
+            c.on('open', () => {
+                DOM.status.innerText = "සම්බන්ධ වුණා! ගේම් එක පටන් ගන්නවා...";
+                setTimeout(() => { conn.send({ type: 'start' }); startGame(); }, 1000);
+            });
+            c.on('data', handleNetworkData);
+        });
+
+        // Client (Sasindi)
+        DOM.connectBtn.onclick = () => {
+            const pid = DOM.partnerId.value.trim();
+            if(!pid) return alert("කරුණාකර ID එකක් දෙන්න!");
+            DOM.status.innerText = "සුමුදුට සම්බන්ධ වෙමින් පවතී...";
+            conn = peer.connect(pid, { reliable: true });
+            myRole = 'sasindi';
+            
+            conn.on('open', () => {
+                DOM.status.innerText = "සම්බන්ධ වුණා! සුමුදු ගේම් එක පටන්ගන්නකම් ඉන්න...";
+            });
+            conn.on('data', handleNetworkData);
+        };
+
+        function handleNetworkData(data) {
+            if (data.type === 'start') startGame();
+            if (data.type === 'sync') {
+                if (data.role === 'sumudu') {
+                    p1.score = data.score; p1.x = data.x;
+                } else {
+                    p2.score = data.score; p2.x = data.x;
+                }
+                updateScoreBoard();
+            }
+        }
+
+        // --- GAME ENGINE (CANVAS 0-ERROR LOGIC) ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        let timeLeft = 180; // 3 minutes
+        let timerInterval, syncInterval;
+        let items = [];
+        let roadOffset = 0;
+        
+        // Players Setup (Split Screen: Left 0-300, Right 300-600)
+        const p1 = { x: 150, y: 650, emoji: '👦🏻', score: 0, minX: 20, maxX: 280 };
+        const p2 = { x: 450, y: 650, emoji: '👧🏻', score: 0, minX: 320, maxX: 580 };
+        
+        // Game Settings
+        const ITEM_TYPES = [
+            { emoji: '❤️', points: 1, prob: 0.5 },
+            { emoji: '🥘', points: 5, prob: 0.05 }, // Polos
+            { emoji: '🍆', points: 5, prob: 0.05 }, // Batu Moju
+            { emoji: '🍛', points: 5, prob: 0.05 }, // Parippu
+            { emoji: '💔', points: -2, prob: 0.15 },
+            { emoji: '🪨', points: -2, prob: 0.1 },
+            { emoji: '💣', points: -2, prob: 0.1 }
+        ];
+
+        let keys = { left: false, right: false };
+
+        // Controls
+        window.addEventListener('keydown', (e) => {
+            if(e.key === 'ArrowLeft') keys.left = true;
+            if(e.key === 'ArrowRight') keys.right = true;
+        });
+        window.addEventListener('keyup', (e) => {
+            if(e.key === 'ArrowLeft') keys.left = false;
+            if(e.key === 'ArrowRight') keys.right = false;
+        });
+        
+        // Mobile Controls
+        DOM.btnLeft.addEventListener('touchstart', (e) => { e.preventDefault(); keys.left = true; });
+        DOM.btnLeft.addEventListener('touchend', (e) => { e.preventDefault(); keys.left = false; });
+        DOM.btnRight.addEventListener('touchstart', (e) => { e.preventDefault(); keys.right = true; });
+        DOM.btnRight.addEventListener('touchend', (e) => { e.preventDefault(); keys.right = false; });
+        
+        DOM.btnLeft.addEventListener('mousedown', () => keys.left = true);
+        DOM.btnLeft.addEventListener('mouseup', () => keys.left = false);
+        DOM.btnRight.addEventListener('mousedown', () => keys.right = true);
+        DOM.btnRight.addEventListener('mouseup', () => keys.right = false);
+
+        function startGame() {
+            DOM.setup.style.display = 'none';
+            DOM.game.style.display = 'flex';
+            gameActive = true;
+            
+            // Timer Loop
+            timerInterval = setInterval(() => {
+                if(timeLeft <= 0) return endGame();
+                timeLeft--;
+                let m = Math.floor(timeLeft / 60).toString().padStart(2, '0');
+                let s = (timeLeft % 60).toString().padStart(2, '0');
+                DOM.timer.innerText = `${m}:${s}`;
+            }, 1000);
+
+            // Network Sync Loop (Sends data 10 times a second for smooth zero-error multiplayer)
+            syncInterval = setInterval(() => {
+                if(!gameActive) return;
+                const me = (myRole === 'sumudu') ? p1 : p2;
+                conn.send({ type: 'sync', role: myRole, score: me.score, x: me.x });
+            }, 100);
+
+            // Item Spawner Loop
+            setInterval(() => {
+                if(!gameActive) return;
+                spawnItem();
+            }, 600); // Spawns new item every 600ms
+
+            gameLoop();
+        }
+
+        function spawnItem() {
+            // Determine random item type based on probabilities
+            let rand = Math.random();
+            let cumulative = 0;
+            let selectedType = ITEM_TYPES[0];
+            for (let t of ITEM_TYPES) {
+                cumulative += t.prob;
+                if (rand < cumulative) { selectedType = t; break; }
+            }
+
+            // Spawn independently in both lanes to keep network traffic zero and zero-lag
+            items.push({
+                x: Math.random() * 260 + 20, // Sumudu's Lane
+                y: -50,
+                emoji: selectedType.emoji,
+                points: selectedType.points,
+                speed: 3 + Math.random() * 2
+            });
+            
+            items.push({
+                x: Math.random() * 260 + 320, // Sasindi's Lane
+                y: -50,
+                emoji: selectedType.emoji,
+                points: selectedType.points,
+                speed: 3 + Math.random() * 2
+            });
+        }
+
+        function updateScoreBoard() {
+            DOM.scoreSumudu.innerText = p1.score;
+            DOM.scoreSasindi.innerText = p2.score;
+        }
+
+        function gameLoop() {
+            if (!gameActive) return;
+
+            // 1. Update My Position
+            let me = (myRole === 'sumudu') ? p1 : p2;
+            if (keys.left && me.x > me.minX) me.x -= 6;
+            if (keys.right && me.x < me.maxX) me.x += 6;
+
+            // 2. Clear Canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 3. Draw Road Divider & Markings
+            ctx.fillStyle = '#34495e'; // Center divider
+            ctx.fillRect(295, 0, 10, canvas.height);
+            
+            ctx.fillStyle = 'rgba(255,255,255,0.3)';
+            roadOffset += 5; // moving road effect
+            if (roadOffset > 60) roadOffset = 0;
+            for(let i = -60; i < canvas.height; i += 60) {
+                ctx.fillRect(145, i + roadOffset, 10, 30); // Left lane dash
+                ctx.fillRect(445, i + roadOffset, 10, 30); // Right lane dash
+            }
+
+            // 4. Update & Draw Items
+            ctx.font = '35px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            for (let i = items.length - 1; i >= 0; i--) {
+                let it = items[i];
+                it.y += it.speed;
+                ctx.fillText(it.emoji, it.x, it.y);
+
+                // Collision Detection (Only check for MY player to prevent double-counting)
+                let dist = Math.hypot(me.x - it.x, me.y - it.y);
+                if (dist < 40) { // Collision hit radius
+                    me.score += it.points;
+                    items.splice(i, 1);
+                    updateScoreBoard();
+                } 
+                // Remove if off screen
+                else if (it.y > canvas.height + 50) {
+                    items.splice(i, 1);
+                }
+            }
+
+            // 5. Draw Players
+            ctx.font = '50px Arial';
+            ctx.fillText(p1.emoji, p1.x, p1.y);
+            ctx.fillText(p2.emoji, p2.x, p2.y);
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function endGame() {
+            gameActive = false;
+            clearInterval(timerInterval);
+            clearInterval(syncInterval);
+            
+            DOM.finalSumudu.innerText = p1.score;
+            DOM.finalSasindi.innerText = p2.score;
+            
+            if (p1.score > p2.score) {
+                DOM.winnerText.innerText = "🎉 සුමුදු දිනුම්!";
+            } else if (p2.score > p1.score) {
+                DOM.winnerText.innerText = "🎉 සසින්දි දිනුම්!";
+            } else {
+                DOM.winnerText.innerText = "🤝 තරඟය සමයි!";
+            }
+            
+            DOM.gameOverScreen.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
