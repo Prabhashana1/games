@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="si">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sumudu & Sasindi - Jungle Co-op 🌿</title>
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+    <style>
+        :root { --primary: #27ae60; --bg: #eafaf1; }
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; font-family: 'Segoe UI', Tahoma, sans-serif; }
+        
+        body { background-color: var(--bg); text-align: center; display: flex; flex-direction: column; align-items: center; min-height: 100vh; overflow: hidden; }
+
+        /* Setup Screen */
+        #setup-screen { background: white; padding: 30px 20px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); max-width: 400px; width: 95%; margin-top: 50px; z-index: 10; }
+        h2 { color: var(--primary); margin-bottom: 10px; }
+        .id-box { background: #d5f5e3; color: #1e8449; padding: 12px; border-radius: 10px; font-weight: bold; font-size: 18px; letter-spacing: 2px; margin: 15px 0; word-wrap: break-word; }
+        input { padding: 12px; width: 90%; margin: 10px 0; border: 2px solid #abebc6; border-radius: 10px; font-size: 16px; outline: none; }
+        .btn { background-color: var(--primary); color: white; border: none; padding: 15px 30px; font-size: 18px; border-radius: 30px; cursor: pointer; font-weight: bold; width: 90%; box-shadow: 0 5px 15px rgba(39, 174, 96, 0.4); margin-top: 10px; }
+        .btn:active { transform: scale(0.95); }
+
+        /* Game Screen */
+        #game-screen { display: none; width: 100%; max-width: 600px; height: 100vh; position: relative; }
+        
+        /* UI Overlay */
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between; z-index: 5; }
+        
+        /* Top Bar - Health & Time */
+        #top-bar { background: rgba(255, 255, 255, 0.9); padding: 15px; border-bottom-left-radius: 20px; border-bottom-right-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); display: flex; flex-direction: column; gap: 10px; }
+        .health-row { display: flex; align-items: center; justify-content: space-between; font-weight: bold; }
+        .health-bar-bg { flex-grow: 1; background: #ddd; height: 15px; border-radius: 10px; margin: 0 10px; overflow: hidden; }
+        .health-bar-fill { height: 100%; border-radius: 10px; transition: width 0.2s; }
+        #timer { font-size: 22px; font-weight: bold; color: #d35400; text-align: center; }
+
+        /* Canvas */
+        #gameCanvas { width: 100%; height: 100%; background-color: #82e0aa; display: block; touch-action: none; pointer-events: auto; }
+
+        /* Bottom Controls */
+        #bottom-bar { padding: 15px; pointer-events: auto; display: flex; justify-content: center; }
+        #share-btn { background: #e74c3c; color: white; border: none; padding: 15px 20px; font-size: 18px; border-radius: 25px; font-weight: bold; box-shadow: 0 5px 15px rgba(231, 76, 60, 0.4); width: 90%; transition: 0.2s; cursor: pointer; }
+        #share-btn:active { transform: scale(0.95); }
+        #share-btn:disabled { background: #95a5a6; box-shadow: none; transform: none; }
+
+        /* Game Over Screen */
+        #game-over-screen { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 50px rgba(0,0,0,0.5); z-index: 100; width: 90%; max-width: 400px; text-align: center; }
+    </style>
+</head>
+<body>
+
+    <!-- Setup Screen -->
+    <div id="setup-screen">
+        <h2>කැලෑවේ වීර චාරිකාව 🌿🔍</h2>
+        <p style="color: #7f8c8d; font-size: 14px;">දෙන්නම එකතු වෙලා විනාඩි 2ක් පණ බේරගන්න! සසින්දි ආස කෑම අරන් Health වැඩි කරගන්න.</p>
+        <div class="id-box" id="my-id">⏳ ID එක සෑදෙමින් පවතී...</div>
+        <input type="text" id="partner-id" placeholder="අනිත් කෙනාගේ ID එක Paste කරන්න">
+        <button class="btn" id="connect-btn">එකට සෙල්ලම් කරමු 🤝</button>
+        <p id="status-msg" style="color: #e67e22; font-size: 14px; margin-top: 15px; font-weight: bold;"></p>
+    </div>
+
+    <!-- Game Screen -->
+    <div id="game-screen">
+        <canvas id="gameCanvas" width="600" height="800"></canvas>
+        
+        <div id="ui-layer">
+            <div id="top-bar">
+                <div id="timer">02:00</div>
+                <div class="health-row">
+                    <span style="color: #2980b9;">👦🏻 සුමුදු</span>
+                    <div class="health-bar-bg"><div id="h-sumudu" class="health-bar-fill" style="background: #3498db; width: 100%;"></div></div>
+                </div>
+                <div class="health-row">
+                    <span style="color: #c0392b;">👧🏻 සසින්දි</span>
+                    <div class="health-bar-bg"><div id="h-sasindi" class="health-bar-fill" style="background: #e74c3c; width: 100%;"></div></div>
+                </div>
+            </div>
+            
+            <div id="bottom-bar">
+                <button id="share-btn">❤️ අනිත් කෙනාට ජීවය දෙන්න</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="game-over-screen">
+        <h1 id="winner-text" style="color: var(--primary); margin-bottom: 20px;"></h1>
+        <p id="over-reason" style="font-size: 16px; margin-bottom: 20px; color: #555;"></p>
+        <button class="btn" onclick="location.reload()">නැවත සෙල්ලම් කරන්න</button>
+    </div>
+
+    <script>
+        // --- 1. NETWORKING (PeerJS) ---
+        const peer = new Peer();
+        let conn = null;
+        let myRole = ''; // 'sumudu' (Host) or 'sasindi' (Client)
+
+        const DOM = {
+            setup: document.getElementById('setup-screen'),
+            game: document.getElementById('game-screen'),
+            status: document.getElementById('status-msg'),
+            myId: document.getElementById('my-id'),
+            partnerId: document.getElementById('partner-id'),
+            connectBtn: document.getElementById('connect-btn'),
+            canvas: document.getElementById('gameCanvas'),
+            hSumudu: document.getElementById('h-sumudu'),
+            hSasindi: document.getElementById('h-sasindi'),
+            timer: document.getElementById('timer'),
+            shareBtn: document.getElementById('share-btn'),
+            gameOver: document.getElementById('game-over-screen'),
+            winnerText: document.getElementById('winner-text'),
+            overReason: document.getElementById('over-reason')
+        };
+
+        const ctx = DOM.canvas.getContext('2d');
+
+        peer.on('open', (id) => { DOM.myId.innerText = id; });
+
+        // Host (Sumudu) Setup
+        peer.on('connection', (c) => {
+            conn = c; myRole = 'sumudu';
+            DOM.status.innerText = "සසින්දි සම්බන්ධ වෙමින් පවතී...";
+            c.on('open', () => {
+                DOM.status.innerText = "සම්බන්ධ වුණා! ගේම් එක පටන් ගන්නවා...";
+                setTimeout(() => { startGameHost(); }, 1000);
+            });
+            c.on('data', handleClientData);
+        });
+
+        // Client (Sasindi) Setup
+        DOM.connectBtn.onclick = () => {
+            const pid = DOM.partnerId.value.trim();
+            if(!pid) return alert("කරුණාකර ID එකක් දෙන්න!");
+            DOM.status.innerText = "සුමුදුට සම්බන්ධ වෙමින් පවතී...";
+            conn = peer.connect(pid, { reliable: true });
+            myRole = 'sasindi';
+            
+            conn.on('open', () => { DOM.status.innerText = "සම්බන්ධ වුණා! සුමුදු ගේම් එක පටන්ගන්නකම් ඉන්න..."; });
+            conn.on('data', handleHostData);
+        };
+
+        // --- 2. GAME STATE (Best Practice: Host Authoritative Architecture) ---
+        let state = {
+            active: false,
+            time: 120, // 2 minutes
+            p1: { x: 200, y: 600, tx: 200, ty: 600, h: 100, emoji: '👦🏻' }, // Sumudu
+            p2: { x: 400, y: 600, tx: 400, ty: 600, h: 100, emoji: '👧🏻' }, // Sasindi
+            items: [], // {x, y, emoji, hp}
+            status: 'playing', // 'playing', 'win', 'lose'
+            reason: ''
+        };
+
+        const FOODS = [
+            { emoji: '🍠', hp: 15 }, // Beet
+            { emoji: '🌿', hp: 15 }, // Kohila
+            { emoji: '🍛', hp: 15 }, // Soya
+            { emoji: '🥒', hp: 15 }  // Karawila
+        ];
+        const OBSTACLES = [ { emoji: '🪨', hp: -20 }, { emoji: '🌵', hp: -20 } ];
+
+        let renderLoop, hostLogicLoop, networkLoop;
+
+        // --- 3. INPUT HANDLING (Tap to move - Super smooth for mobile) ---
+        function updateMyTarget(e) {
+            if(!state.active) return;
+            const rect = DOM.canvas.getBoundingClientRect();
+            let clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            let clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            
+            // Calculate scale to match canvas internal resolution
+            const scaleX = DOM.canvas.width / rect.width;
+            const scaleY = DOM.canvas.height / rect.height;
+            
+            let tx = (clientX - rect.left) * scaleX;
+            let ty = (clientY - rect.top) * scaleY;
+            
+            // Constrain
+            tx = Math.max(30, Math.min(DOM.canvas.width - 30, tx));
+            ty = Math.max(30, Math.min(DOM.canvas.height - 30, ty));
+
+            if(myRole === 'sumudu') {
+                state.p1.tx = tx; state.p1.ty = ty;
+            } else {
+                conn.send({ type: 'target', x: tx, y: ty });
+            }
+        }
+
+        DOM.canvas.addEventListener('mousedown', updateMyTarget);
+        DOM.canvas.addEventListener('mousemove', (e) => { if(e.buttons === 1) updateMyTarget(e); });
+        DOM.canvas.addEventListener('touchstart', updateMyTarget);
+        DOM.canvas.addEventListener('touchmove', updateMyTarget);
+
+        DOM.shareBtn.onclick = () => {
+            if(myRole === 'sumudu') handleShareHealth('sumudu');
+            else conn.send({ type: 'share' });
+        };
+
+        // --- 4. HOST LOGIC (Zero Error Mechanics) ---
+        function startGameHost() {
+            DOM.setup.style.display = 'none';
+            DOM.game.style.display = 'block';
+            state.active = true;
+
+            // Send start signal
+            conn.send({ type: 'start' });
+
+            // 60FPS Logic Loop
+            hostLogicLoop = setInterval(() => {
+                if(!state.active) return;
+
+                // Move players towards targets smoothly
+                state.p1.x += (state.p1.tx - state.p1.x) * 0.1;
+                state.p1.y += (state.p1.ty - state.p1.y) * 0.1;
+                state.p2.x += (state.p2.tx - state.p2.x) * 0.1;
+                state.p2.y += (state.p2.ty - state.p2.y) * 0.1;
+
+                // Move items down
+                for (let i = state.items.length - 1; i >= 0; i--) {
+                    let it = state.items[i];
+                    it.y += it.speed;
+
+                    // Collision checking
+                    let hitP1 = Math.hypot(state.p1.x - it.x, state.p1.y - it.y) < 40;
+                    let hitP2 = Math.hypot(state.p2.x - it.x, state.p2.y - it.y) < 40;
+
+                    if (hitP1 || hitP2) {
+                        if (hitP1) state.p1.h = Math.min(100, state.p1.h + it.hp);
+                        if (hitP2) state.p2.h = Math.min(100, state.p2.h + it.hp);
+                        state.items.splice(i, 1);
+                    } else if (it.y > 850) {
+                        state.items.splice(i, 1); // Remove off-screen
+                    }
+                }
+
+                // Passive health drain (Walking takes energy)
+                state.p1.h -= 0.05; 
+                state.p2.h -= 0.05;
+
+                checkWinLoss();
+            }, 1000/60);
+
+            // Item Spawner (Every 1 second)
+            setInterval(() => {
+                if(!state.active) return;
+                let isFood = Math.random() > 0.3; // 70% food, 30% obstacles
+                let type = isFood ? FOODS[Math.floor(Math.random() * FOODS.length)] : OBSTACLES[Math.floor(Math.random() * OBSTACLES.length)];
+                
+                state.items.push({
+                    x: Math.random() * 500 + 50,
+                    y: -50,
+                    emoji: type.emoji,
+                    hp: type.hp,
+                    speed: 2 + Math.random() * 2
+                });
+            }, 800);
+
+            // Timer (1 per second)
+            setInterval(() => { if(state.active) state.time--; }, 1000);
+
+            // Network Sync (Broadcast state to Client 20 times a second)
+            networkLoop = setInterval(() => {
+                if(state.active) conn.send({ type: 'sync', state: state });
+            }, 50);
+
+            startRendering();
+        }
+
+        function checkWinLoss() {
+            if (state.time <= 0) {
+                state.status = 'win';
+                state.reason = "ඔයාලා දෙන්නා එකතු වෙලා කැලෑවෙන් බේරුණා! ආදරේට පුළුවන් හැමදේම දිනන්න.";
+                state.active = false;
+            } else if (state.p1.h <= 0) {
+                state.status = 'lose';
+                state.reason = "සුමුදුගේ ශක්තිය ඉවර වුණා. දෙන්නා එකටම තමයි දිනන්න ඕනේ.";
+                state.active = false;
+            } else if (state.p2.h <= 0) {
+                state.status = 'lose';
+                state.reason = "සසින්දිගේ ශක්තිය ඉවර වුණා. අනිත් කෙනාට උදව් කරන්න අමතක කරන්න එපා.";
+                state.active = false;
+            }
+
+            if(!state.active) {
+                conn.send({ type: 'gameover', status: state.status, reason: state.reason });
+                showGameOver(state.status, state.reason);
+            }
+        }
+
+        function handleShareHealth(player) {
+            let giver = player === 'sumudu' ? state.p1 : state.p2;
+            let receiver = player === 'sumudu' ? state.p2 : state.p1;
+            
+            // Can share if near each other and have enough health
+            let dist = Math.hypot(giver.x - receiver.x, giver.y - receiver.y);
+            if (dist < 150 && giver.h > 20) {
+                giver.h -= 15;
+                receiver.h = Math.min(100, receiver.h + 15);
+            }
+        }
+
+        function handleClientData(data) {
+            if (data.type === 'target') {
+                state.p2.tx = data.x;
+                state.p2.ty = data.y;
+            } else if (data.type === 'share') {
+                handleShareHealth('sasindi');
+            }
+        }
+
+        // --- 5. CLIENT LOGIC ---
+        function handleHostData(data) {
+            if (data.type === 'start') {
+                DOM.setup.style.display = 'none';
+                DOM.game.style.display = 'block';
+                state.active = true;
+                startRendering();
+            } else if (data.type === 'sync') {
+                state = data.state; // Trust the host completely (Zero desync)
+            } else if (data.type === 'gameover') {
+                state.active = false;
+                showGameOver(data.status, data.reason);
+            }
+        }
+
+        // --- 6. RENDER ENGINE (For both Host & Client) ---
+        let bgOffset = 0;
+        function startRendering() {
+            function draw() {
+                if(!state.active && state.status === 'playing') return;
+
+                // Clear & draw animated jungle floor
+                ctx.fillStyle = '#a9dfbf';
+                ctx.fillRect(0, 0, DOM.canvas.width, DOM.canvas.height);
+                
+                bgOffset += 2;
+                if(bgOffset > 100) bgOffset = 0;
+                ctx.fillStyle = 'rgba(39, 174, 96, 0.1)';
+                for(let i = 0; i < 800; i+=100) {
+                    ctx.fillRect(0, i + bgOffset, 600, 50);
+                }
+
+                // Draw Items
+                ctx.font = '40px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                state.items.forEach(it => { ctx.fillText(it.emoji, it.x, it.y); });
+
+                // Draw Players
+                ctx.font = '55px Arial';
+                ctx.fillText(state.p1.emoji, state.p1.x, state.p1.y);
+                ctx.fillText(state.p2.emoji, state.p2.x, state.p2.y);
+
+                // Draw connection line if close enough to share health
+                let dist = Math.hypot(state.p1.x - state.p2.x, state.p1.y - state.p2.y);
+                if(dist < 150) {
+                    ctx.beginPath();
+                    ctx.moveTo(state.p1.x, state.p1.y);
+                    ctx.lineTo(state.p2.x, state.p2.y);
+                    ctx.strokeStyle = 'rgba(231, 76, 60, 0.3)';
+                    ctx.lineWidth = 5;
+                    ctx.stroke();
+                    DOM.shareBtn.disabled = false;
+                    DOM.shareBtn.innerText = "❤️ ජීවය දෙන්න (ළඟින් ඉන්නේ)";
+                } else {
+                    DOM.shareBtn.disabled = true;
+                    DOM.shareBtn.innerText = "ළං වෙන්න උදව් කරන්න";
+                }
+
+                // Update UI Bars
+                DOM.hSumudu.style.width = Math.max(0, state.p1.h) + '%';
+                DOM.hSasindi.style.width = Math.max(0, state.p2.h) + '%';
+                
+                let m = Math.floor(state.time / 60).toString().padStart(2, '0');
+                let s = Math.max(0, state.time % 60).toString().padStart(2, '0');
+                DOM.timer.innerText = `${m}:${s}`;
+
+                if(state.active) requestAnimationFrame(draw);
+            }
+            draw();
+        }
+
+        function showGameOver(status, reason) {
+            DOM.winnerText.innerText = status === 'win' ? "🎉 ජයග්‍රහණයක්!" : "😢 පරාදයි!";
+            DOM.winnerText.style.color = status === 'win' ? "#27ae60" : "#c0392b";
+            DOM.overReason.innerText = reason;
+            DOM.gameOver.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
