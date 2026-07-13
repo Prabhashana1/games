@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Sumudu & Sasindi - Love Journey ❤️</title>
-    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+    <!-- PeerJS වෙනුවට 100% සාර්ථක MQTT Cloud තාක්ෂණය -->
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
     <style>
         :root { --primary: #e74c3c; --bg: #fdf2e9; }
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
@@ -36,14 +37,14 @@
         .id-box {
             background: #fadbd8; color: #c0392b;
             padding: 12px; border-radius: 10px;
-            font-weight: bold; font-size: 18px; letter-spacing: 2px;
+            font-weight: bold; font-size: 16px; letter-spacing: 1px;
             margin: 15px 0; word-wrap: break-word;
         }
 
         input {
             padding: 12px; width: 90%; margin: 10px 0;
             border: 2px solid #f5b7b1; border-radius: 10px;
-            font-size: 16px; outline: none;
+            font-size: 16px; outline: none; text-align: center;
         }
 
         .btn {
@@ -84,7 +85,7 @@
         #gameCanvas {
             flex-grow: 1;
             width: 100%;
-            background-color: #7f8c8d; /* Road color */
+            background-color: #7f8c8d;
             display: block;
         }
 
@@ -126,15 +127,16 @@
     <!-- Setup Screen -->
     <div id="setup-screen">
         <h2>ආදර ගමන ❤️🚗</h2>
-        <p style="color: #7f8c8d; font-size: 14px;">හාට් සහ බෝනස් කෑම (පොලොස්, පරිප්පු) එකතු කරන්න. බාධක වලින් බේරෙන්න!</p>
+        <p style="color: #7f8c8d; font-size: 14px;">හාට් සහ බෝනස් කෑම (පොලොස්, පරිප්පු, බටු මෝජු) එකතු කරන්න. බාධක වලින් බේරෙන්න!</p>
         
-        <div class="id-box" id="my-id">⏳ ID එක සෑදෙමින් පවතී...</div>
+        <p style="font-weight: bold; margin-bottom: 5px; margin-top: 15px;">ඔයාගේ Game ID එක:</p>
+        <div class="id-box" id="my-id">Cloud Server එකට සම්බන්ධ වෙමින් පවතී...</div>
         
-        <p style="font-weight: bold; margin-top: 15px;">අනිත් කෙනාගේ ID එක මෙතනට දෙන්න:</p>
+        <p style="font-weight: bold; margin-top: 15px;">හෝ අනිත් කෙනාගේ ID එක මෙතනට දෙන්න:</p>
         <input type="text" id="partner-id" placeholder="ID එක Paste කරන්න">
         
         <button class="btn" id="connect-btn">Connect & Play 🚀</button>
-        <p id="status-msg" style="color: #e67e22; font-size: 14px; margin-top: 15px; font-weight: bold;"></p>
+        <p id="status-msg" style="color: #27ae60; font-size: 14px; margin-top: 15px; font-weight: bold;"></p>
     </div>
 
     <!-- Game Screen -->
@@ -162,10 +164,10 @@
     </div>
 
     <script>
-        // --- PEER.JS CONNECTION LOGIC ---
-        const peer = new Peer();
-        let conn = null;
-        let myRole = ''; // 'sumudu' (host) or 'sasindi' (client)
+        // --- 1. MQTT CLOUD NETWORKING LOGIC (Zero-Error Best Practice) ---
+        const client = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
+        let myRole = 'sumudu'; // Default to Host
+        let gameTopic = 'sumudu_sasindi_lovejourney_' + Math.floor(Math.random() * 100000);
         let gameActive = false;
 
         const DOM = {
@@ -186,37 +188,55 @@
             finalSasindi: document.getElementById('final-sasindi')
         };
 
-        peer.on('open', (id) => { DOM.myId.innerText = id; });
-
-        // Host (Sumudu)
-        peer.on('connection', (c) => {
-            conn = c;
-            myRole = 'sumudu';
-            DOM.status.innerText = "සසින්දි සම්බන්ධ වෙමින් පවතී...";
-            c.on('open', () => {
-                DOM.status.innerText = "සම්බන්ධ වුණා! ගේම් එක පටන් ගන්නවා...";
-                setTimeout(() => { conn.send({ type: 'start' }); startGame(); }, 1000);
-            });
-            c.on('data', handleNetworkData);
+        // When connected to the Cloud Broker
+        client.on('connect', () => {
+            DOM.myId.innerText = gameTopic;
+            client.subscribe(gameTopic);
+            DOM.status.innerText = "Cloud Server එකට සම්බන්ධයි ✅";
         });
 
-        // Client (Sasindi)
+        // Listen for incoming messages
+        client.on('message', (topic, message) => {
+            const msg = JSON.parse(message.toString());
+            // Ignore self-sent messages
+            if (msg.sender === myRole) return; 
+            handleNetworkData(msg.payload);
+        });
+
+        // Function to send data through Cloud
+        function sendNetworkData(payload) {
+            client.publish(gameTopic, JSON.stringify({ sender: myRole, payload: payload }));
+        }
+
+        // Client (Sasindi) connects to Host
         DOM.connectBtn.onclick = () => {
             const pid = DOM.partnerId.value.trim();
             if(!pid) return alert("කරුණාකර ID එකක් දෙන්න!");
-            DOM.status.innerText = "සුමුදුට සම්බන්ධ වෙමින් පවතී...";
-            conn = peer.connect(pid, { reliable: true });
-            myRole = 'sasindi';
             
-            conn.on('open', () => {
-                DOM.status.innerText = "සම්බන්ධ වුණා! සුමුදු ගේම් එක පටන්ගන්නකම් ඉන්න...";
-            });
-            conn.on('data', handleNetworkData);
+            // Switch to Partner's Channel
+            client.unsubscribe(gameTopic);
+            gameTopic = pid;
+            client.subscribe(gameTopic);
+            
+            myRole = 'sasindi';
+            DOM.status.innerText = "සුමුදුට සම්බන්ධ වෙමින් පවතී...";
+            
+            // Tell host we joined
+            sendNetworkData({ type: 'join' });
         };
 
         function handleNetworkData(data) {
-            if (data.type === 'start') startGame();
-            if (data.type === 'sync') {
+            if (data.type === 'join' && myRole === 'sumudu') {
+                DOM.status.innerText = "සසින්දි සම්බන්ධ වුණා! ගේම් එක පටන් ගන්නවා...";
+                setTimeout(() => { 
+                    sendNetworkData({ type: 'start' }); 
+                    startGame(); 
+                }, 1000);
+            }
+            else if (data.type === 'start') {
+                startGame();
+            }
+            else if (data.type === 'sync') {
                 if (data.role === 'sumudu') {
                     p1.score = data.score; p1.x = data.x;
                 } else {
@@ -226,7 +246,7 @@
             }
         }
 
-        // --- GAME ENGINE (CANVAS 0-ERROR LOGIC) ---
+        // --- 2. GAME ENGINE (CANVAS LOGIC) ---
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         
@@ -235,11 +255,10 @@
         let items = [];
         let roadOffset = 0;
         
-        // Players Setup (Split Screen: Left 0-300, Right 300-600)
+        // Players Setup
         const p1 = { x: 150, y: 650, emoji: '👦🏻', score: 0, minX: 20, maxX: 280 };
         const p2 = { x: 450, y: 650, emoji: '👧🏻', score: 0, minX: 320, maxX: 580 };
         
-        // Game Settings
         const ITEM_TYPES = [
             { emoji: '❤️', points: 1, prob: 0.5 },
             { emoji: '🥘', points: 5, prob: 0.05 }, // Polos
@@ -278,7 +297,6 @@
             DOM.game.style.display = 'flex';
             gameActive = true;
             
-            // Timer Loop
             timerInterval = setInterval(() => {
                 if(timeLeft <= 0) return endGame();
                 timeLeft--;
@@ -287,24 +305,22 @@
                 DOM.timer.innerText = `${m}:${s}`;
             }, 1000);
 
-            // Network Sync Loop (Sends data 10 times a second for smooth zero-error multiplayer)
+            // Network Sync Loop (Sends data 10 times a second using MQTT)
             syncInterval = setInterval(() => {
                 if(!gameActive) return;
                 const me = (myRole === 'sumudu') ? p1 : p2;
-                conn.send({ type: 'sync', role: myRole, score: me.score, x: me.x });
+                sendNetworkData({ type: 'sync', role: myRole, score: me.score, x: me.x });
             }, 100);
 
-            // Item Spawner Loop
             setInterval(() => {
                 if(!gameActive) return;
                 spawnItem();
-            }, 600); // Spawns new item every 600ms
+            }, 600); 
 
             gameLoop();
         }
 
         function spawnItem() {
-            // Determine random item type based on probabilities
             let rand = Math.random();
             let cumulative = 0;
             let selectedType = ITEM_TYPES[0];
@@ -313,9 +329,8 @@
                 if (rand < cumulative) { selectedType = t; break; }
             }
 
-            // Spawn independently in both lanes to keep network traffic zero and zero-lag
             items.push({
-                x: Math.random() * 260 + 20, // Sumudu's Lane
+                x: Math.random() * 260 + 20, 
                 y: -50,
                 emoji: selectedType.emoji,
                 points: selectedType.points,
@@ -323,7 +338,7 @@
             });
             
             items.push({
-                x: Math.random() * 260 + 320, // Sasindi's Lane
+                x: Math.random() * 260 + 320, 
                 y: -50,
                 emoji: selectedType.emoji,
                 points: selectedType.points,
@@ -339,27 +354,23 @@
         function gameLoop() {
             if (!gameActive) return;
 
-            // 1. Update My Position
             let me = (myRole === 'sumudu') ? p1 : p2;
             if (keys.left && me.x > me.minX) me.x -= 6;
             if (keys.right && me.x < me.maxX) me.x += 6;
 
-            // 2. Clear Canvas
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // 3. Draw Road Divider & Markings
-            ctx.fillStyle = '#34495e'; // Center divider
+            ctx.fillStyle = '#34495e'; 
             ctx.fillRect(295, 0, 10, canvas.height);
             
             ctx.fillStyle = 'rgba(255,255,255,0.3)';
-            roadOffset += 5; // moving road effect
+            roadOffset += 5; 
             if (roadOffset > 60) roadOffset = 0;
             for(let i = -60; i < canvas.height; i += 60) {
-                ctx.fillRect(145, i + roadOffset, 10, 30); // Left lane dash
-                ctx.fillRect(445, i + roadOffset, 10, 30); // Right lane dash
+                ctx.fillRect(145, i + roadOffset, 10, 30); 
+                ctx.fillRect(445, i + roadOffset, 10, 30); 
             }
 
-            // 4. Update & Draw Items
             ctx.font = '35px Arial';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
@@ -369,20 +380,17 @@
                 it.y += it.speed;
                 ctx.fillText(it.emoji, it.x, it.y);
 
-                // Collision Detection (Only check for MY player to prevent double-counting)
                 let dist = Math.hypot(me.x - it.x, me.y - it.y);
-                if (dist < 40) { // Collision hit radius
+                if (dist < 40) { 
                     me.score += it.points;
                     items.splice(i, 1);
                     updateScoreBoard();
                 } 
-                // Remove if off screen
                 else if (it.y > canvas.height + 50) {
                     items.splice(i, 1);
                 }
             }
 
-            // 5. Draw Players
             ctx.font = '50px Arial';
             ctx.fillText(p1.emoji, p1.x, p1.y);
             ctx.fillText(p2.emoji, p2.x, p2.y);
