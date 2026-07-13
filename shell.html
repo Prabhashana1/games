@@ -3,68 +3,76 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sumudu & Sasindi - Pearl Hunt 🦪</title>
-    <!-- Cloud MQTT තාක්ෂණය -->
+    <title>Sumudu & Sasindi - Live Pearl Hunt 🦪</title>
+    <!-- Cloud MQTT තාක්ෂණය (Zero Error Architecture) -->
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
     <style>
-        :root { --primary: #0984e3; --bg: #ffeaa7; --text: #2d3436; }
+        :root { --sumudu-color: #0984e3; --sasindi-color: #e84393; --bg: #f5f6fa; }
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; font-family: 'Segoe UI', Tahoma, sans-serif; }
         
         body { background-color: var(--bg); text-align: center; display: flex; flex-direction: column; align-items: center; min-height: 100vh; overflow: hidden; position: relative; }
 
         /* Setup Screen */
-        #setup-screen { background: white; padding: 30px 20px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); max-width: 400px; width: 95%; margin-top: 50px; z-index: 10; position: absolute; }
-        h2 { color: var(--primary); margin-bottom: 10px; }
-        .id-box { background: #74b9ff; color: white; padding: 12px; border-radius: 10px; font-weight: bold; font-size: 16px; letter-spacing: 1px; margin: 15px 0; word-wrap: break-word; }
-        input { padding: 12px; width: 90%; margin: 10px 0; border: 2px solid #74b9ff; border-radius: 10px; font-size: 16px; outline: none; text-align: center; }
-        .btn { background-color: var(--primary); color: white; border: none; padding: 15px 30px; font-size: 18px; border-radius: 30px; cursor: pointer; font-weight: bold; width: 90%; box-shadow: 0 5px 15px rgba(9, 132, 227, 0.4); margin-top: 10px; transition: 0.2s; }
+        #setup-screen { background: white; padding: 30px 20px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); max-width: 400px; width: 95%; margin-top: 50px; z-index: 100; position: absolute; }
+        h2 { color: #2d3436; margin-bottom: 10px; }
+        .id-box { background: #dfe6e9; color: #2d3436; padding: 12px; border-radius: 10px; font-weight: bold; font-size: 16px; letter-spacing: 1px; margin: 15px 0; word-wrap: break-word; }
+        input { padding: 12px; width: 90%; margin: 10px 0; border: 2px solid #b2bec3; border-radius: 10px; font-size: 16px; outline: none; text-align: center; }
+        .btn { background-color: #00b894; color: white; border: none; padding: 15px 30px; font-size: 18px; border-radius: 30px; cursor: pointer; font-weight: bold; width: 90%; box-shadow: 0 5px 15px rgba(0, 184, 148, 0.4); margin-top: 10px; transition: 0.2s; }
         .btn:active { transform: scale(0.95); }
 
         /* Game Screen */
-        #game-screen { display: none; width: 100%; max-width: 600px; height: 100vh; flex-direction: column; justify-content: space-between; background: linear-gradient(180deg, #81ecec 0%, #74b9ff 100%); position: relative; padding: 20px 0; }
+        #game-screen { display: none; width: 100%; max-width: 500px; height: 100vh; flex-direction: column; background: #c8d6e5; position: relative; }
         
-        /* Player Zones (Top and Bottom) */
-        .player-zone { background: rgba(255,255,255,0.9); padding: 15px 30px; border-radius: 20px; font-weight: bold; font-size: 22px; display: inline-block; margin: 0 auto; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
-        #sasindi-zone { color: #e84393; border-top-left-radius: 0; border-top-right-radius: 0; margin-top: -20px; }
-        #sumudu-zone { color: #0984e3; border-bottom-left-radius: 0; border-bottom-right-radius: 0; margin-bottom: -20px; }
-
-        /* Game Area */
-        #play-area { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 40px; }
+        #round-banner { background: #2d3436; color: #f1c40f; padding: 10px; font-weight: bold; font-size: 18px; z-index: 10; box-shadow: 0 2px 10px rgba(0,0,0,0.2); }
         
-        #round-info { background: #fdcb6e; color: #2d3436; padding: 10px 25px; border-radius: 20px; font-weight: bold; font-size: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
-        #msg-info { font-size: 18px; font-weight: bold; color: white; text-shadow: 1px 1px 4px rgba(0,0,0,0.5); min-height: 25px; }
-
-        #shells-container { display: flex; justify-content: center; gap: 20px; width: 100%; padding: 0 20px; }
+        /* Player Zones (Split Screen) */
+        .player-zone { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; overflow: hidden; padding: 10px; }
         
-        .shell-wrapper { position: relative; width: 90px; height: 90px; cursor: pointer; display: flex; justify-content: center; align-items: center; }
-        .shell-emoji { font-size: 70px; position: absolute; z-index: 2; transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-        .pearl-emoji { font-size: 45px; position: absolute; z-index: 1; opacity: 0; transform: translateY(20px); transition: 0.3s; }
+        /* Opponent (Top) and My (Bottom) specific styling */
+        #top-zone { background: rgba(255, 255, 255, 0.4); border-bottom: 4px solid #8395a7; transform: rotate(180deg); /* Optional: Rotates opponent board so it faces them visually, but let's keep it straight for easy viewing */ transform: none; }
+        #bottom-zone { background: rgba(255, 255, 255, 0.7); }
 
-        /* Animations */
-        .shuffling .shell-emoji { animation: shake 0.4s infinite alternate; }
-        @keyframes shake {
-            0% { transform: translateX(0) rotate(0deg); }
-            25% { transform: translateX(-15px) rotate(-10deg); }
-            50% { transform: translateX(15px) rotate(10deg); }
-            75% { transform: translateX(-10px) rotate(-5deg); }
-            100% { transform: translateX(0) rotate(0deg); }
-        }
+        .player-title { font-size: 20px; font-weight: bold; padding: 5px 20px; border-radius: 20px; color: white; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .sumudu-style { background-color: var(--sumudu-color); }
+        .sasindi-style { background-color: var(--sasindi-color); }
 
-        .revealed .shell-emoji { transform: translateY(-40px) scale(1.1); }
-        .revealed .pearl-emoji { opacity: 1; transform: translateY(10px); }
+        /* Shell Board */
+        .board { position: relative; width: 280px; height: 110px; margin: 0 auto; }
+        .shell-wrap { position: absolute; width: 80px; height: 110px; transition: left 0.4s ease-in-out; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
         
-        .empty-revealed .shell-emoji { transform: translateY(-30px); opacity: 0.7; filter: grayscale(100%); }
+        .shell { font-size: 65px; z-index: 2; transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); filter: drop-shadow(0 5px 5px rgba(0,0,0,0.2)); cursor: pointer; }
+        .pearl { font-size: 35px; position: absolute; bottom: 20px; z-index: 1; opacity: 0; transition: opacity 0.2s; }
+
+        /* Board States & Animations */
+        .show-pearl .shell { transform: translateY(-50px); }
+        .show-pearl .pearl { opacity: 1; }
+
+        .selected .shell { transform: scale(1.1) translateY(-10px); filter: drop-shadow(0 0 10px #f1c40f); }
+        
+        .guessed-right .shell { transform: translateY(-50px); filter: drop-shadow(0 0 15px #00b894); }
+        .guessed-right .pearl { opacity: 1; filter: drop-shadow(0 0 10px #00b894); }
+        
+        .guessed-wrong .shell { transform: translateY(-50px); opacity: 0.5; filter: grayscale(100%); }
+        .missed-pearl .shell { transform: translateY(-50px); }
+        .missed-pearl .pearl { opacity: 1; }
+
+        /* Status Badge */
+        .status-badge { font-weight: bold; font-size: 16px; margin-top: 15px; min-height: 25px; padding: 5px 15px; border-radius: 15px; background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .locked-badge { background: #00b894; color: white; }
+
+        /* Overlay Message */
+        #center-msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: white; padding: 15px 30px; border-radius: 25px; font-weight: bold; font-size: 22px; z-index: 50; display: none; white-space: nowrap; }
 
         /* End Screen */
-        #end-screen { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 50px rgba(0,0,0,0.5); z-index: 100; width: 90%; max-width: 400px; text-align: center; }
+        #end-screen { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 50px rgba(0,0,0,0.5); z-index: 200; width: 90%; max-width: 400px; text-align: center; }
     </style>
 </head>
 <body>
 
     <!-- Setup Screen -->
     <div id="setup-screen">
-        <h2>මුතු ඇටය හොයමු 🦪</h2>
-        <p style="color: #636e72; font-size: 14px; margin-bottom: 20px;">වට 10 යි. මුලින්ම හරියටම මුතු ඇටය තියෙන සිප්පි කටුව ඔබන කෙනා දිනුම්!</p>
+        <h2>Live මුතු ඇටය හොයමු 🦪</h2>
+        <p style="color: #636e72; font-size: 14px; margin-bottom: 20px;">සිප්පි කටු කරකැවෙන විදිහ දැන් දෙන්නටම එකට පේනවා. ඇස් දෙක ලොකු කරලා හරියටම මුතු ඇටේ අල්ලගන්න!</p>
         
         <p style="font-weight: bold; margin-bottom: 5px;">ඔයාගේ Game ID එක:</p>
         <div class="id-box" id="my-id">Cloud Server සම්බන්ධ වෙමින්...</div>
@@ -72,78 +80,92 @@
         <p style="font-weight: bold; margin-top: 15px;">හෝ අනිත් කෙනාගේ ID එක:</p>
         <input type="text" id="partner-id" placeholder="ID එක Paste කරන්න">
         <button class="btn" id="connect-btn">ගේම් එකට යමු 🚀</button>
-        <p id="status-msg" style="color: #27ae60; font-size: 14px; margin-top: 15px; font-weight: bold;"></p>
+        <p id="setup-msg" style="color: #00b894; font-size: 14px; margin-top: 15px; font-weight: bold;"></p>
     </div>
 
     <!-- Game Screen -->
     <div id="game-screen">
-        <div class="player-zone" id="sasindi-zone">👧🏻 සසින්දි: <span id="score-sasindi">0</span></div>
         
-        <div id="play-area">
-            <div id="round-info">වටය <span id="round-num">1</span> / 10</div>
-            
-            <div id="shells-container">
-                <div class="shell-wrapper" onclick="handleGuess(0)">
-                    <div class="pearl-emoji" id="pearl-0">⚪</div>
-                    <div class="shell-emoji" id="shell-0">🦪</div>
-                </div>
-                <div class="shell-wrapper" onclick="handleGuess(1)">
-                    <div class="pearl-emoji" id="pearl-1">⚪</div>
-                    <div class="shell-emoji" id="shell-1">🦪</div>
-                </div>
-                <div class="shell-wrapper" onclick="handleGuess(2)">
-                    <div class="pearl-emoji" id="pearl-2">⚪</div>
-                    <div class="shell-emoji" id="shell-2">🦪</div>
-                </div>
+        <!-- Opponent's Board (Top) -->
+        <div id="top-zone" class="player-zone">
+            <div class="player-title" id="top-title">Opponent</div>
+            <div class="board" id="top-board">
+                <div class="shell-wrap" id="top-s0"><div class="pearl">⚪</div><div class="shell">🦪</div></div>
+                <div class="shell-wrap" id="top-s1"><div class="pearl">⚪</div><div class="shell">🦪</div></div>
+                <div class="shell-wrap" id="top-s2"><div class="pearl">⚪</div><div class="shell">🦪</div></div>
             </div>
-
-            <div id="msg-info">සිප්පි කටු මාරු වෙනවා...</div>
+            <div class="status-badge" id="top-status">බලාපොරොත්තු වේ...</div>
         </div>
 
-        <div class="player-zone" id="sumudu-zone">👦🏻 සුමුදු: <span id="score-sumudu">0</span></div>
+        <div id="round-banner">වටය <span id="round-num">1</span> / 10</div>
+        <div id="center-msg">මාරු වෙනවා! 👀</div>
+
+        <!-- My Board (Bottom) -->
+        <div id="bottom-zone" class="player-zone">
+            <div class="board" id="bottom-board">
+                <div class="shell-wrap" id="bottom-s0" onclick="makeGuess(0)"><div class="pearl">⚪</div><div class="shell">🦪</div></div>
+                <div class="shell-wrap" id="bottom-s1" onclick="makeGuess(1)"><div class="pearl">⚪</div><div class="shell">🦪</div></div>
+                <div class="shell-wrap" id="bottom-s2" onclick="makeGuess(2)"><div class="pearl">⚪</div><div class="shell">🦪</div></div>
+            </div>
+            <div class="player-title" id="bottom-title" style="margin-top:20px; margin-bottom:0;">You</div>
+            <div class="status-badge" id="bottom-status">සූදානම් වන්න...</div>
+        </div>
+
     </div>
 
     <!-- End Screen -->
     <div id="end-screen">
-        <h1 id="winner-text" style="color: var(--primary); margin-bottom: 10px; font-size: 35px;">🎉</h1>
+        <h1 id="winner-text" style="color: #00b894; margin-bottom: 10px; font-size: 35px;">🎉</h1>
         <h2 style="color: #2d3436; margin-bottom: 20px;">තරඟය අවසන්!</h2>
-        <p style="font-size: 18px; margin-bottom: 10px; font-weight: bold;">සුමුදු: <span id="final-sumudu">0</span></p>
-        <p style="font-size: 18px; margin-bottom: 20px; font-weight: bold;">සසින්දි: <span id="final-sasindi">0</span></p>
+        <p style="font-size: 18px; margin-bottom: 10px; font-weight: bold; color: var(--sumudu-color);">👦🏻 සුමුදුගේ ලකුණු: <span id="final-sumudu">0</span></p>
+        <p style="font-size: 18px; margin-bottom: 20px; font-weight: bold; color: var(--sasindi-color);">👧🏻 සසින්දිගේ ලකුණු: <span id="final-sasindi">0</span></p>
         <button class="btn" onclick="location.reload()">නැවත සෙල්ලම් කරන්න</button>
     </div>
 
     <script>
-        // --- 1. CLOUD NETWORKING (MQTT - Zero Error Architecture) ---
+        // --- 1. CLOUD NETWORKING (MQTT) ---
         const client = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
         let myRole = 'sumudu'; // Default host
-        let gameTopic = 'pearl_hunt_' + Math.floor(Math.random() * 100000);
+        let oppRole = 'sasindi';
+        let gameTopic = 'live_pearl_' + Math.floor(Math.random() * 100000);
 
         const DOM = {
             setup: document.getElementById('setup-screen'),
             game: document.getElementById('game-screen'),
-            status: document.getElementById('status-msg'),
+            setupMsg: document.getElementById('setup-msg'),
             myId: document.getElementById('my-id'),
             partnerId: document.getElementById('partner-id'),
             connectBtn: document.getElementById('connect-btn'),
-            scoreSumudu: document.getElementById('score-sumudu'),
-            scoreSasindi: document.getElementById('score-sasindi'),
+            
+            topTitle: document.getElementById('top-title'),
+            bottomTitle: document.getElementById('bottom-title'),
+            topStatus: document.getElementById('top-status'),
+            bottomStatus: document.getElementById('bottom-status'),
             roundNum: document.getElementById('round-num'),
-            msgInfo: document.getElementById('msg-info'),
-            shells: [
-                document.getElementById('shell-0').parentElement,
-                document.getElementById('shell-1').parentElement,
-                document.getElementById('shell-2').parentElement
-            ],
+            centerMsg: document.getElementById('center-msg'),
+            
             endScreen: document.getElementById('end-screen'),
             winnerText: document.getElementById('winner-text'),
             finalSumudu: document.getElementById('final-sumudu'),
             finalSasindi: document.getElementById('final-sasindi')
         };
 
+        // UI Board Data Structures
+        const boards = {
+            top: {
+                shells: [document.getElementById('top-s0'), document.getElementById('top-s1'), document.getElementById('top-s2')],
+                posMapping: [0, 1, 2] // shellId -> current visual position
+            },
+            bottom: {
+                shells: [document.getElementById('bottom-s0'), document.getElementById('bottom-s1'), document.getElementById('bottom-s2')],
+                posMapping: [0, 1, 2]
+            }
+        };
+
         client.on('connect', () => {
             DOM.myId.innerText = gameTopic;
             client.subscribe(gameTopic);
-            DOM.status.innerText = "Cloud Server එකට සම්බන්ධයි ✅";
+            DOM.setupMsg.innerText = "Cloud Server එකට සම්බන්ධයි ✅";
         });
 
         client.on('message', (topic, message) => {
@@ -165,128 +187,268 @@
             client.subscribe(gameTopic);
             
             myRole = 'sasindi';
-            DOM.status.innerText = "සුමුදුට සම්බන්ධ වෙමින් පවතී...";
+            oppRole = 'sumudu';
+            DOM.setupMsg.innerText = "සුමුදුට සම්බන්ධ වෙමින් පවතී...";
             sendNetworkData({ type: 'join' });
         };
 
-        // --- 2. GAME LOGIC (Host Authoritative) ---
+        // --- 2. HOST AUTHORITATIVE GAME LOGIC ---
         let state = {
-            round: 1,
+            round: 0,
             scores: { sumudu: 0, sasindi: 0 },
-            phase: 'waiting', // waiting, shuffling, guessing, revealed
-            pearlIndex: 0,
-            winner: null // round winner
+            phase: 'waiting', // showing, hiding, shuffling, guessing, revealing
+            pearls: { sumudu: 0, sasindi: 0 }, // Which shell ID has the pearl
+            swaps: { sumudu: [], sasindi: [] }, // Array of position swaps
+            guesses: { sumudu: -1, sasindi: -1 } // Which shell ID they guessed
         };
+
+        let currentPhaseLocal = '';
 
         function handleNetworkData(data) {
             if (data.type === 'join' && myRole === 'sumudu') {
-                DOM.status.innerText = "සසින්දි සම්බන්ධ වුණා! ගේම් එක පටන් ගන්නවා...";
-                setTimeout(() => { startRound(); }, 1000);
+                DOM.setupMsg.innerText = "සසින්දි සම්බන්ධ වුණා! ගේම් එක පටන් ගන්නවා...";
+                setupPlayerTitles();
+                setTimeout(() => { startNextRound(); }, 1000);
             }
             else if (data.type === 'sync') {
+                if(state.round === 0) setupPlayerTitles(); // Initial setup for client
+                let oldPhase = currentPhaseLocal;
                 state = data.state;
-                renderState();
+                currentPhaseLocal = state.phase;
+                
+                updateUIState();
+                
+                // Trigger shuffle animation locally when phase changes to shuffling
+                if (oldPhase !== 'shuffling' && currentPhaseLocal === 'shuffling') {
+                    playShuffleAnimations();
+                }
             }
             else if (data.type === 'guess' && myRole === 'sumudu') {
-                processGuess(data.player, data.index);
+                processGuess(data.player, data.shellId);
             }
         }
 
-        // Host ONLY: Manage rounds
-        function startRound() {
-            if(state.round > 10) return endGame();
+        function setupPlayerTitles() {
+            DOM.setup.style.display = 'none';
+            DOM.game.style.display = 'flex';
             
-            state.phase = 'shuffling';
-            state.pearlIndex = Math.floor(Math.random() * 3);
-            state.winner = null;
-            sendNetworkData({ type: 'sync', state: state });
-            renderState();
+            DOM.bottomTitle.innerText = myRole === 'sumudu' ? '👦🏻 සුමුදු: 0' : '👧🏻 සසින්දි: 0';
+            DOM.bottomTitle.className = 'player-title ' + (myRole === 'sumudu' ? 'sumudu-style' : 'sasindi-style');
+            
+            DOM.topTitle.innerText = oppRole === 'sumudu' ? '👦🏻 සුමුදු: 0' : '👧🏻 සසින්දි: 0';
+            DOM.topTitle.className = 'player-title ' + (oppRole === 'sumudu' ? 'sumudu-style' : 'sasindi-style');
+        }
 
-            // Shuffle for 2 seconds
+        // Host ONLY
+        function startNextRound() {
+            if (state.round >= 10) return endGame();
+            
+            state.round++;
+            state.guesses = { sumudu: -1, sasindi: -1 };
+            
+            // Assign random pearls
+            state.pearls.sumudu = Math.floor(Math.random() * 3);
+            state.pearls.sasindi = Math.floor(Math.random() * 3);
+            
+            // Generate shuffle sequences (8-10 swaps)
+            state.swaps.sumudu = generateSwaps(9);
+            state.swaps.sasindi = generateSwaps(9);
+            
+            // Phase 1: Showing pearls
+            state.phase = 'showing';
+            sendNetworkData({ type: 'sync', state: state });
+            updateUIState();
+
+            // Phase 2: Hiding
+            setTimeout(() => {
+                state.phase = 'hiding';
+                sendNetworkData({ type: 'sync', state: state });
+                updateUIState();
+            }, 2500);
+
+            // Phase 3: Shuffling
+            setTimeout(() => {
+                state.phase = 'shuffling';
+                sendNetworkData({ type: 'sync', state: state });
+                updateUIState();
+                playShuffleAnimations(); // Host plays its own animation
+            }, 3000);
+            
+            // Phase 4: Guessing (Wait for animation to finish: 9 swaps * 400ms = 3600ms)
             setTimeout(() => {
                 state.phase = 'guessing';
                 sendNetworkData({ type: 'sync', state: state });
-                renderState();
-            }, 2000);
+                updateUIState();
+            }, 3000 + (9 * 400));
         }
 
-        // Host ONLY: Process guesses
-        function processGuess(player, index) {
-            if (state.phase !== 'guessing') return;
-
-            state.phase = 'revealed';
-            
-            if (index === state.pearlIndex) {
-                // Correct guess
-                state.scores[player]++;
-                state.winner = player;
-            } else {
-                // Wrong guess! Point goes to the other player.
-                let otherPlayer = player === 'sumudu' ? 'sasindi' : 'sumudu';
-                state.scores[otherPlayer]++;
-                state.winner = otherPlayer;
+        function generateSwaps(count) {
+            let swaps = [];
+            for(let i=0; i<count; i++) {
+                let a = Math.floor(Math.random() * 3);
+                let b = (a + 1 + Math.floor(Math.random() * 2)) % 3;
+                swaps.push([a, b]);
             }
-
-            sendNetworkData({ type: 'sync', state: state });
-            renderState();
-
-            // Wait 2.5 seconds, then next round
-            setTimeout(() => {
-                state.round++;
-                startRound();
-            }, 2500);
+            return swaps;
         }
 
-        // Both Players: Handle click
-        window.handleGuess = function(index) {
+        // Host ONLY
+        function processGuess(player, shellId) {
             if (state.phase !== 'guessing') return;
+            
+            state.guesses[player] = shellId;
+            sendNetworkData({ type: 'sync', state: state });
+            updateUIState();
+
+            // Check if BOTH have guessed
+            if (state.guesses.sumudu !== -1 && state.guesses.sasindi !== -1) {
+                // Calculate scores
+                if (state.guesses.sumudu === state.pearls.sumudu) state.scores.sumudu++;
+                if (state.guesses.sasindi === state.pearls.sasindi) state.scores.sasindi++;
+                
+                state.phase = 'revealing';
+                sendNetworkData({ type: 'sync', state: state });
+                updateUIState();
+
+                setTimeout(() => { startNextRound(); }, 3500);
+            }
+        }
+
+        // --- 3. CLIENT ACTIONS & RENDERING ---
+        
+        window.makeGuess = function(shellId) {
+            if (state.phase !== 'guessing') return;
+            if (state.guesses[myRole] !== -1) return; // Already guessed
+
+            // Instantly show local selection
+            boards.bottom.shells[shellId].classList.add('selected');
+            DOM.bottomStatus.innerText = "ඔයා තේරුවා 🔒";
+            DOM.bottomStatus.classList.add('locked-badge');
 
             if (myRole === 'sumudu') {
-                processGuess('sumudu', index);
+                processGuess('sumudu', shellId);
             } else {
-                sendNetworkData({ type: 'guess', player: 'sasindi', index: index });
+                sendNetworkData({ type: 'guess', player: 'sasindi', shellId: shellId });
             }
         };
 
-        // --- 3. RENDER ENGINE ---
-        function renderState() {
-            DOM.setup.style.display = 'none';
-            DOM.game.style.display = 'flex';
-
-            DOM.roundNum.innerText = Math.min(state.round, 10);
-            DOM.scoreSumudu.innerText = state.scores.sumudu;
-            DOM.scoreSasindi.innerText = state.scores.sasindi;
-
-            // Reset Shells
-            DOM.shells.forEach(shell => {
-                shell.classList.remove('shuffling', 'revealed', 'empty-revealed');
-            });
-
-            if (state.phase === 'shuffling') {
-                DOM.msgInfo.innerText = "සිප්පි කටු මාරු වෙනවා... 👀";
-                DOM.shells.forEach(shell => shell.classList.add('shuffling'));
-            } 
-            else if (state.phase === 'guessing') {
-                DOM.msgInfo.innerText = "ඉක්මනට මුතු ඇටේ තියෙන එක ඔබන්න! 👆";
-            } 
-            else if (state.phase === 'revealed') {
-                if (state.winner === myRole) {
-                    DOM.msgInfo.innerText = "🎉 නියමයි! ඔයාට ලකුණක් හම්බුණා!";
-                    DOM.msgInfo.style.color = "#ffeaa7";
-                } else {
-                    DOM.msgInfo.innerText = "කණගාටුයි! අනිත් කෙනා ලකුණ ගත්තා 😢";
-                    DOM.msgInfo.style.color = "#ff7675";
-                }
-
-                // Show pearl
-                DOM.shells.forEach((shell, idx) => {
-                    if (idx === state.pearlIndex) {
-                        shell.classList.add('revealed');
-                    } else {
-                        shell.classList.add('empty-revealed');
-                    }
+        function resetBoardVisuals() {
+            // Reset shell positions strictly to 0, 100, 200 px
+            [boards.top, boards.bottom].forEach(board => {
+                board.posMapping = [0, 1, 2];
+                board.shells.forEach((shell, i) => {
+                    shell.style.left = (i * 100) + 'px';
+                    shell.className = 'shell-wrap'; // Remove all state classes
                 });
+            });
+            DOM.centerMsg.style.display = 'none';
+            DOM.topStatus.className = 'status-badge';
+            DOM.bottomStatus.className = 'status-badge';
+        }
+
+        function updateUIState() {
+            DOM.roundNum.innerText = state.round;
+            
+            // Update Titles with Scores
+            DOM.bottomTitle.innerText = (myRole === 'sumudu' ? '👦🏻 සුමුදු: ' : '👧🏻 සසින්දි: ') + state.scores[myRole];
+            DOM.topTitle.innerText = (oppRole === 'sumudu' ? '👦🏻 සුමුදු: ' : '👧🏻 සසින්දි: ') + state.scores[oppRole];
+
+            if (state.phase === 'showing') {
+                resetBoardVisuals();
+                DOM.centerMsg.innerText = "බලාගන්න... 👀";
+                DOM.centerMsg.style.display = 'block';
+                DOM.topStatus.innerText = "අවධානයෙන් ඉන්න!";
+                DOM.bottomStatus.innerText = "අවධානයෙන් ඉන්න!";
+                
+                // Show pearls under correct shells
+                let myPearlId = state.pearls[myRole];
+                let oppPearlId = state.pearls[oppRole];
+                
+                boards.bottom.shells[myPearlId].classList.add('show-pearl');
+                boards.top.shells[oppPearlId].classList.add('show-pearl');
             }
+            else if (state.phase === 'hiding') {
+                boards.bottom.shells.forEach(s => s.classList.remove('show-pearl'));
+                boards.top.shells.forEach(s => s.classList.remove('show-pearl'));
+            }
+            else if (state.phase === 'shuffling') {
+                DOM.centerMsg.innerText = "මාරු වෙනවා! 🌀";
+            }
+            else if (state.phase === 'guessing') {
+                DOM.centerMsg.style.display = 'none';
+                
+                // Update my status
+                if (state.guesses[myRole] === -1) {
+                    DOM.bottomStatus.innerText = "මුතු ඇටය කොහෙද? ඔබන්න! 👆";
+                }
+                
+                // Update opponent status
+                if (state.guesses[oppRole] !== -1) {
+                    DOM.topStatus.innerText = "තෝරලා ඉවරයි 🔒";
+                    DOM.topStatus.classList.add('locked-badge');
+                } else {
+                    DOM.topStatus.innerText = "තෝරමින් පවතී...";
+                }
+            }
+            else if (state.phase === 'revealing') {
+                // Reveal logic for both boards
+                revealBoard('bottom', myRole);
+                revealBoard('top', oppRole);
+            }
+        }
+
+        function revealBoard(boardSide, playerRole) {
+            let board = boards[boardSide];
+            let guessedId = state.guesses[playerRole];
+            let realPearlId = state.pearls[playerRole];
+
+            if (guessedId === realPearlId) {
+                board.shells[guessedId].classList.add('guessed-right');
+                if(boardSide === 'bottom') DOM.bottomStatus.innerText = "නියමයි! ඔයා හරි! 🎉";
+                if(boardSide === 'top') DOM.topStatus.innerText = "හරියටම තේරුවා! 👏";
+            } else {
+                if(guessedId !== -1) board.shells[guessedId].classList.add('guessed-wrong');
+                board.shells[realPearlId].classList.add('missed-pearl');
+                if(boardSide === 'bottom') DOM.bottomStatus.innerText = "අයියෝ වැරදුණා! 😢";
+                if(boardSide === 'top') DOM.topStatus.innerText = "වැරදි එකක් තේරුවේ 🤣";
+            }
+        }
+
+        // --- 4. SHUFFLE ANIMATION ENGINE ---
+        function playShuffleAnimations() {
+            let step = 0;
+            let mySwaps = state.swaps[myRole];
+            let oppSwaps = state.swaps[oppRole];
+
+            let shuffleInterval = setInterval(() => {
+                if (step >= mySwaps.length) {
+                    clearInterval(shuffleInterval);
+                    return;
+                }
+                
+                // Animate My Board
+                animateSwap(boards.bottom, mySwaps[step][0], mySwaps[step][1]);
+                // Animate Opponent Board
+                animateSwap(boards.top, oppSwaps[step][0], oppSwaps[step][1]);
+                
+                step++;
+            }, 400); // Speed of shuffle: 400ms per swap
+        }
+
+        function animateSwap(board, posA, posB) {
+            if(posA === posB) return;
+            
+            // Find which shell ID is currently at posA and posB
+            let shellId_A = board.posMapping.indexOf(posA);
+            let shellId_B = board.posMapping.indexOf(posB);
+            
+            // Update mapping
+            board.posMapping[shellId_A] = posB;
+            board.posMapping[shellId_B] = posA;
+            
+            // Apply CSS transition
+            board.shells[shellId_A].style.left = (posB * 100) + 'px';
+            board.shells[shellId_B].style.left = (posA * 100) + 'px';
         }
 
         function endGame() {
