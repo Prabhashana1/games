@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="si">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sumudu & Sasindi - Treasure Hunt 🏺</title>
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #fdf6e3;
+            text-align: center;
+            margin: 0;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 95vh;
+        }
+        h2 { color: #d35400; margin-bottom: 5px; font-size: 22px; }
+        
+        #setup-screen, #game-screen {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            max-width: 450px;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        #game-screen { display: none; padding: 15px; }
+
+        input {
+            padding: 10px;
+            width: 80%;
+            margin: 10px 0;
+            border: 2px solid #e67e22;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+
+        button.btn-primary {
+            background-color: #e67e22;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            font-size: 16px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 4px 6px rgba(230, 126, 34, 0.3);
+            transition: transform 0.1s;
+        }
+        button.btn-primary:active { transform: scale(0.95); }
+
+        .id-box {
+            background: #fae5d3;
+            padding: 10px;
+            border-radius: 8px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            margin-bottom: 15px;
+            word-wrap: break-word;
+            color: #d35400;
+        }
+
+        .scoreboard {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 16px;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #fcf3cf;
+            border-radius: 10px;
+        }
+        .sasindi-score { color: #c0392b; }
+        .sumudu-score { color: #2980b9; }
+
+        /* Hard Mode Grid - 100 Boxes */
+        #grid-container {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            gap: 4px;
+            margin: 0 auto;
+        }
+
+        .grid-box {
+            background-color: #edbb99;
+            border-radius: 4px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            cursor: pointer;
+            box-shadow: inset 0 -2px 0 rgba(0,0,0,0.1);
+            transition: background-color 0.2s;
+        }
+
+        .grid-box.revealed {
+            background-color: #fbeee6;
+            cursor: default;
+            box-shadow: none;
+        }
+
+        #game-over-msg {
+            font-size: 18px;
+            font-weight: bold;
+            margin-top: 15px;
+            color: #27ae60;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Setup Screen -->
+    <div id="setup-screen">
+        <h2>සසින්දිගේ පුරාවිද්‍යා නිධානය 🏺🔍</h2>
+        <p style="font-size: 14px; color: gray; font-weight: bold;">(Hard Mode: කොටු 100 යි!)</p>
+        <p style="font-size: 13px; color: #555;">නිධන් 10 ක් හැංගිලා තියෙනවා. ඉක්මනින් හොයාගන්න!</p>
+        
+        <p>ඔයාගේ Game ID එක සසින්දිට යවන්න:</p>
+        <div class="id-box" id="my-id">Generating ID...</div>
+        
+        <p>හෝ සසින්දිගේ ID එක මෙතනට දෙන්න:</p>
+        <input type="text" id="partner-id" placeholder="ID එක Paste කරන්න">
+        <br>
+        <button class="btn-primary" id="connect-btn">Connect & Play 🚀</button>
+        <p id="status-msg" style="color: gray; font-size: 14px;"></p>
+    </div>
+
+    <!-- Game Screen -->
+    <div id="game-screen">
+        <h2>නිධානය හොයමු! 🔍</h2>
+        
+        <div class="scoreboard">
+            <div class="sasindi-score">සසින්දි: <span id="score-sasindi">0</span></div>
+            <div class="sumudu-score">සුමුදු: <span id="score-sumudu">0</span></div>
+        </div>
+
+        <div id="grid-container"></div>
+
+        <div id="game-over-msg"></div>
+    </div>
+
+    <script>
+        const peer = new Peer();
+        let conn;
+        let myPlayerName = ''; 
+        let scores = { sumudu: 0, sasindi: 0 };
+        let gameBoard = []; 
+        let treasuresFound = 0;
+        let hostStarted = false;
+        const totalBoxes = 100;
+        const totalTreasures = 10;
+
+        const setupScreen = document.getElementById('setup-screen');
+        const gameScreen = document.getElementById('game-screen');
+        const gridContainer = document.getElementById('grid-container');
+        const statusMsg = document.getElementById('status-msg');
+        const gameOverMsg = document.getElementById('game-over-msg');
+
+        peer.on('open', function(id) {
+            document.getElementById('my-id').innerText = id;
+        });
+
+        // Host Connection
+        peer.on('connection', function(c) {
+            conn = c;
+            myPlayerName = 'sumudu'; 
+            statusMsg.innerText = "Partner connecting... Please wait.";
+            
+            c.on('open', function() {
+                setupGameHost();
+            });
+            
+            if (c.open) {
+                setupGameHost();
+            }
+        });
+
+        // Client Connection
+        document.getElementById('connect-btn').onclick = function() {
+            const partnerId = document.getElementById('partner-id').value.trim();
+            if(!partnerId) return alert("ID එකක් දෙන්න!");
+            
+            statusMsg.innerText = "Connecting to partner...";
+            conn = peer.connect(partnerId, { reliable: true });
+            myPlayerName = 'sasindi'; 
+            
+            conn.on('open', function() {
+                statusMsg.innerText = "Connected! Loading game...";
+                setupGameClient();
+            });
+        };
+
+        function setupGameHost() {
+            if(hostStarted) return;
+            hostStarted = true;
+
+            // 10 Treasures for Hard Mode
+            const treasures = ['🏺', '💎', '👑', '💍', '❤️', '🪙', '📜', '🗿', '🧿', '🗝️'];
+            gameBoard = Array(totalBoxes).fill('❌');
+            
+            let placed = 0;
+            while(placed < totalTreasures) {
+                let randIndex = Math.floor(Math.random() * totalBoxes);
+                if(gameBoard[randIndex] === '❌') {
+                    gameBoard[randIndex] = treasures[placed];
+                    placed++;
+                }
+            }
+
+            conn.on('data', handleData);
+            
+            setTimeout(() => {
+                conn.send({ type: 'start', board: gameBoard });
+                startGameUI();
+            }, 1500);
+        }
+
+        function setupGameClient() {
+            conn.on('data', handleData);
+        }
+
+        function handleData(data) {
+            if (data.type === 'start') {
+                gameBoard = data.board;
+                startGameUI();
+            } else if (data.type === 'tap') {
+                revealBox(data.index, data.player);
+            }
+        }
+
+        function startGameUI() {
+            setupScreen.style.display = 'none';
+            gameScreen.style.display = 'block';
+            gridContainer.innerHTML = '';
+            
+            for(let i = 0; i < totalBoxes; i++) {
+                let box = document.createElement('div');
+                box.className = 'grid-box';
+                box.dataset.index = i;
+                box.onclick = () => handleTap(i);
+                gridContainer.appendChild(box);
+            }
+        }
+
+        function handleTap(index) {
+            let box = gridContainer.children[index];
+            if(box.classList.contains('revealed') || treasuresFound >= totalTreasures) return;
+            
+            revealBox(index, myPlayerName);
+            conn.send({ type: 'tap', index: index, player: myPlayerName });
+        }
+
+        function revealBox(index, playerWhoTapped) {
+            let box = gridContainer.children[index];
+            if(box.classList.contains('revealed')) return;
+
+            box.classList.add('revealed');
+            let item = gameBoard[index];
+            box.innerText = item;
+
+            // Optional: change text color if it's not a treasure to make emojis pop
+            if(item === '❌') {
+                box.style.color = '#e74c3c';
+            }
+
+            if (item !== '❌') {
+                scores[playerWhoTapped]++;
+                treasuresFound++;
+                document.getElementById('score-sasindi').innerText = scores.sasindi;
+                document.getElementById('score-sumudu').innerText = scores.sumudu;
+
+                if (treasuresFound >= totalTreasures) {
+                    declareWinner();
+                }
+            }
+        }
+
+        function declareWinner() {
+            if (scores.sumudu > scores.sasindi) {
+                gameOverMsg.innerText = "🎉 සුමුදු දිනුම්! ඔයා තමයි වැඩියෙන්ම නිධන් හෙව්වේ!";
+            } else if (scores.sasindi > scores.sumudu) {
+                gameOverMsg.innerText = "🎉 සසින්දි දිනුම්! සසින්දි තමයි වැඩියෙන්ම නිධන් හෙව්වේ!";
+            } else {
+                gameOverMsg.innerText = "🤝 තරඟය සමයි! දෙන්නම දිනුම්!";
+            }
+        }
+    </script>
+</body>
+</html>
