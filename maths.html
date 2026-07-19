@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="si">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sumudu & Sasindi - Math Champion 🧮🧠</title>
+    <!-- Cloud MQTT තාක්ෂණය (Zero Error Architecture) -->
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <style>
+        :root { --primary: #6c5ce7; --success: #00b894; --danger: #d63031; --bg: #f5f6fa; }
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; font-family: 'Segoe UI', Tahoma, sans-serif; }
+        
+        body { background-color: var(--bg); text-align: center; display: flex; flex-direction: column; align-items: center; min-height: 100vh; overflow: hidden; position: relative; }
+
+        /* Setup Screen */
+        #setup-screen { background: white; padding: 30px 20px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); max-width: 400px; width: 95%; margin-top: 50px; z-index: 100; position: absolute; }
+        h2 { color: var(--primary); margin-bottom: 10px; }
+        .id-box { background: #dfe6e9; color: #2d3436; padding: 12px; border-radius: 10px; font-weight: bold; font-size: 16px; letter-spacing: 1px; margin: 15px 0; word-wrap: break-word; }
+        input { padding: 12px; width: 90%; margin: 10px 0; border: 2px solid #b2bec3; border-radius: 10px; font-size: 16px; outline: none; text-align: center; }
+        .btn { background-color: var(--primary); color: white; border: none; padding: 15px 30px; font-size: 18px; border-radius: 30px; cursor: pointer; font-weight: bold; width: 90%; box-shadow: 0 5px 15px rgba(108, 92, 231, 0.4); margin-top: 10px; transition: 0.2s; }
+        .btn:active { transform: scale(0.95); }
+
+        /* Countdown Screen */
+        #countdown-screen { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: var(--primary); color: white; flex-direction: column; justify-content: center; align-items: center; z-index: 150; }
+        #countdown-text { font-size: 120px; font-weight: bold; animation: pop 1s infinite; }
+        @keyframes pop { 0% { transform: scale(0.5); opacity: 0; } 50% { transform: scale(1.2); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+
+        /* Game Screen */
+        #game-screen { display: none; width: 100%; max-width: 500px; height: 100vh; flex-direction: column; background: white; position: relative; }
+        
+        /* Header - Opponent Progress */
+        #header-bar { background: #2d3436; color: white; padding: 15px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .opp-progress-row { display: flex; align-items: center; justify-content: space-between; font-weight: bold; font-size: 16px; }
+        .progress-bg { flex-grow: 1; height: 15px; background: #636e72; border-radius: 10px; margin: 0 15px; overflow: hidden; }
+        .progress-fill { height: 100%; background: #fdcb6e; width: 0%; transition: width 0.3s; }
+        
+        /* Timer */
+        #timer-box { font-size: 35px; font-weight: bold; color: var(--primary); padding: 20px 0; background: #fdf5e6; margin-bottom: 20px; border-bottom: 3px solid #ffeaa7; }
+
+        /* Question Area */
+        #question-area { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; }
+        #question-counter { color: #b2bec3; font-weight: bold; font-size: 18px; margin-bottom: 10px; }
+        #question-text { font-size: 55px; font-weight: bold; color: #2d3436; margin-bottom: 40px; }
+
+        /* Options Area */
+        #options-container { display: flex; flex-direction: column; gap: 15px; width: 90%; max-width: 350px; margin: 0 auto 40px auto; }
+        .option-btn { background: #f1f2f6; border: 3px solid #dfe6e9; padding: 20px; font-size: 24px; font-weight: bold; color: #2d3436; border-radius: 15px; cursor: pointer; transition: 0.2s; box-shadow: 0 4px 0 #dfe6e9; }
+        .option-btn:active { transform: translateY(4px); box-shadow: 0 0 0 #dfe6e9; }
+        .option-btn.wrong { background: var(--danger); color: white; border-color: #b33939; box-shadow: 0 4px 0 #b33939; animation: shake 0.4s; }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-10px); } 75% { transform: translateX(10px); } }
+
+        /* End Screen */
+        #end-screen { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 50px rgba(0,0,0,0.5); z-index: 200; width: 90%; max-width: 400px; text-align: center; }
+        .winner-title { font-size: 35px; margin-bottom: 15px; }
+        .time-text { font-size: 22px; font-weight: bold; color: var(--primary); margin-bottom: 25px; }
+    </style>
+</head>
+<body>
+
+    <!-- Setup Screen -->
+    <div id="setup-screen">
+        <h2>ගණිත ශූරයා 🧮🧠</h2>
+        <p style="color: #636e72; font-size: 14px; margin-bottom: 20px;">ගණන් 10ක් තියෙනවා. එකතු කිරීම්, අඩු කිරීම්, ගුණ කිරීම් සහ බෙදීම්. නිවැරදි උත්තරේ මුලින්ම තෝරලා ඉවර කරන කෙනා දිනුම්!</p>
+        
+        <p style="font-weight: bold; margin-bottom: 5px;">ඔයාගේ Game ID එක:</p>
+        <div class="id-box" id="my-id">Cloud Server සම්බන්ධ වෙමින්...</div>
+        
+        <p style="font-weight: bold; margin-top: 15px;">හෝ අනිත් කෙනාගේ ID එක:</p>
+        <input type="text" id="partner-id" placeholder="ID එක Paste කරන්න">
+        <button class="btn" id="connect-btn">ගේම් එකට යමු 🚀</button>
+        <p id="setup-msg" style="color: #00b894; font-size: 14px; margin-top: 15px; font-weight: bold;"></p>
+    </div>
+
+    <!-- Countdown Screen -->
+    <div id="countdown-screen">
+        <div id="countdown-text">3</div>
+    </div>
+
+    <!-- Game Screen -->
+    <div id="game-screen">
+        <div id="header-bar">
+            <div class="opp-progress-row">
+                <span id="opp-name">ප්‍රතිවාදියා</span>
+                <div class="progress-bg"><div class="progress-fill" id="opp-progress"></div></div>
+                <span id="opp-score-text">0/10</span>
+            </div>
+        </div>
+        
+        <div id="timer-box">00:00</div>
+        
+        <div id="question-area">
+            <div id="question-counter">ගණන 1 / 10</div>
+            <div id="question-text">45 + 23 = ?</div>
+            
+            <div id="options-container">
+                <button class="option-btn" onclick="checkAnswer(0)" id="opt-0">68</button>
+                <button class="option-btn" onclick="checkAnswer(1)" id="opt-1">78</button>
+                <button class="option-btn" onclick="checkAnswer(2)" id="opt-2">58</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- End Screen -->
+    <div id="end-screen">
+        <h1 class="winner-title" id="winner-text">🎉</h1>
+        <p style="font-size: 18px; margin-bottom: 10px; font-weight: bold; color: #2d3436;" id="end-msg">තරඟය අවසන්!</p>
+        <div class="time-text" id="final-time">කාලය: 00:00</div>
+        <button class="btn" onclick="location.reload()">නැවත සෙල්ලම් කරන්න</button>
+    </div>
+
+    <script>
+        // --- 1. CLOUD NETWORKING (MQTT) ---
+        const client = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
+        let myRole = 'sumudu'; // Default host
+        let oppRole = 'sasindi';
+        let gameTopic = 'math_champ_' + Math.floor(Math.random() * 100000);
+
+        const DOM = {
+            setup: document.getElementById('setup-screen'),
+            countdown: document.getElementById('countdown-screen'),
+            game: document.getElementById('game-screen'),
+            endScreen: document.getElementById('end-screen'),
+            
+            setupMsg: document.getElementById('setup-msg'),
+            myId: document.getElementById('my-id'),
+            partnerId: document.getElementById('partner-id'),
+            connectBtn: document.getElementById('connect-btn'),
+            
+            oppName: document.getElementById('opp-name'),
+            oppProgress: document.getElementById('opp-progress'),
+            oppScoreText: document.getElementById('opp-score-text'),
+            
+            timerBox: document.getElementById('timer-box'),
+            qCounter: document.getElementById('question-counter'),
+            qText: document.getElementById('question-text'),
+            opts: [document.getElementById('opt-0'), document.getElementById('opt-1'), document.getElementById('opt-2')],
+            
+            winnerText: document.getElementById('winner-text'),
+            endMsg: document.getElementById('end-msg'),
+            finalTime: document.getElementById('final-time')
+        };
+
+        client.on('connect', () => {
+            DOM.myId.innerText = gameTopic;
+            client.subscribe(gameTopic);
+            DOM.setupMsg.innerText = "Cloud Server එකට සම්බන්ධයි ✅";
+        });
+
+        client.on('message', (topic, message) => {
+            const msg = JSON.parse(message.toString());
+            if (msg.sender === myRole) return; 
+            handleNetworkData(msg.payload);
+        });
+
+        function sendNetworkData(payload) {
+            client.publish(gameTopic, JSON.stringify({ sender: myRole, payload: payload }));
+        }
+
+        DOM.connectBtn.onclick = () => {
+            const pid = DOM.partnerId.value.trim();
+            if(!pid) return alert("කරුණාකර ID එකක් දෙන්න!");
+            
+            client.unsubscribe(gameTopic);
+            gameTopic = pid;
+            client.subscribe(gameTopic);
+            
+            myRole = 'sasindi';
+            oppRole = 'sumudu';
+            DOM.setupMsg.innerText = "සුමුදුට සම්බන්ධ වෙමින් පවතී...";
+            sendNetworkData({ type: 'join' });
+        };
+
+        // --- 2. GAME STATE & LOGIC ---
+        let state = {
+            questions: [],
+            myScore: 0,
+            oppScore: 0,
+            startTime: null,
+            timerInterval: null,
+            isGameOver: false
+        };
+
+        function handleNetworkData(data) {
+            if (data.type === 'join' && myRole === 'sumudu') {
+                DOM.setupMsg.innerText = "සසින්දි සම්බන්ධ වුණා! ගණන් හදමින් පවතී...";
+                let qs = generateQuestions();
+                setTimeout(() => {
+                    sendNetworkData({ type: 'start', questions: qs });
+                    startGame(qs);
+                }, 1000);
+            }
+            else if (data.type === 'start') {
+                startGame(data.questions);
+            }
+            else if (data.type === 'progress') {
+                state.oppScore = data.score;
+                updateOpponentUI();
+            }
+            else if (data.type === 'win') {
+                showLoserScreen(data.player, data.time);
+            }
+        }
+
+        // --- 3. QUESTION GENERATOR ---
+        function generateQuestions() {
+            let qList = [];
+            const ops = ['+', '-', '*', '/'];
+            
+            // Fixed division pairs to ensure strictly 2-digit answers and numbers
+            const divPairs = [[96,12], [84,14], [75,15], [60,12], [90,15], [88,11], [65,13], [52,13], [72,12], [48,12], [99,11], [77,11]];
+
+            for(let i = 0; i < 10; i++) {
+                let op = ops[Math.floor(Math.random() * ops.length)];
+                let num1, num2, ans;
+
+                if (op === '+') {
+                    num1 = Math.floor(Math.random() * 80) + 10;
+                    num2 = Math.floor(Math.random() * 80) + 10;
+                    ans = num1 + num2;
+                } else if (op === '-') {
+                    num1 = Math.floor(Math.random() * 80) + 20;
+                    num2 = Math.floor(Math.random() * (num1 - 10)) + 10; // Ensure positive result
+                    ans = num1 - num2;
+                } else if (op === '*') {
+                    num1 = Math.floor(Math.random() * 6) + 10; // 10 to 15
+                    num2 = Math.floor(Math.random() * 6) + 10; // 10 to 15
+                    ans = num1 * num2;
+                } else if (op === '/') {
+                    let pair = divPairs[Math.floor(Math.random() * divPairs.length)];
+                    num1 = pair[0];
+                    num2 = pair[1];
+                    ans = num1 / num2;
+                }
+
+                // Generate 3 unique options
+                let opt1 = ans + Math.floor(Math.random() * 5) + 1;
+                let opt2 = ans - Math.floor(Math.random() * 5) - 1;
+                let options = [ans, opt1, opt2].sort(() => Math.random() - 0.5);
+
+                qList.push({ text: `${num1} ${op} ${num2}`, ans: ans, options: options });
+            }
+            return qList;
+        }
+
+        // --- 4. GAME FLOW ---
+        function startGame(questions) {
+            state.questions = questions;
+            state.myScore = 0;
+            state.oppScore = 0;
+            state.isGameOver = false;
+
+            DOM.setup.style.display = 'none';
+            DOM.oppName.innerText = oppRole === 'sumudu' ? '👦🏻 සුමුදු' : '👧🏻 සසින්දි';
+            updateOpponentUI();
+
+            // Run Countdown
+            DOM.countdown.style.display = 'flex';
+            let count = 3;
+            let countText = document.getElementById('countdown-text');
+            
+            let countInt = setInterval(() => {
+                count--;
+                if(count > 0) {
+                    countText.innerText = count;
+                } else if (count === 0) {
+                    countText.innerText = "GO!";
+                } else {
+                    clearInterval(countInt);
+                    DOM.countdown.style.display = 'none';
+                    DOM.game.style.display = 'flex';
+                    
+                    // Start Timer
+                    state.startTime = Date.now();
+                    state.timerInterval = setInterval(updateTimer, 1000);
+                    
+                    loadQuestion();
+                }
+            }, 1000);
+        }
+
+        function updateTimer() {
+            if(state.isGameOver) return;
+            let elapsed = Math.floor((Date.now() - state.startTime) / 1000);
+            let m = Math.floor(elapsed / 60).toString().padStart(2, '0');
+            let s = (elapsed % 60).toString().padStart(2, '0');
+            DOM.timerBox.innerText = `${m}:${s}`;
+        }
+
+        function getFormattedTime() {
+            return DOM.timerBox.innerText;
+        }
+
+        function loadQuestion() {
+            if(state.myScore >= 10) {
+                // I WIN!
+                state.isGameOver = true;
+                clearInterval(state.timerInterval);
+                let finalTime = getFormattedTime();
+                
+                sendNetworkData({ type: 'win', player: myRole, time: finalTime });
+                showWinnerScreen(finalTime);
+                return;
+            }
+
+            let q = state.questions[state.myScore];
+            DOM.qCounter.innerText = `ගණන ${state.myScore + 1} / 10`;
+            DOM.qText.innerText = q.text + " = ?";
+            
+            // Reset buttons
+            DOM.opts.forEach((btn, idx) => {
+                btn.innerText = q.options[idx];
+                btn.className = 'option-btn';
+                btn.disabled = false;
+            });
+        }
+
+        window.checkAnswer = function(optIndex) {
+            if(state.isGameOver) return;
+            
+            let q = state.questions[state.myScore];
+            let selectedVal = parseInt(DOM.opts[optIndex].innerText);
+
+            if (selectedVal === q.ans) {
+                // Correct
+                state.myScore++;
+                sendNetworkData({ type: 'progress', score: state.myScore });
+                loadQuestion();
+            } else {
+                // Wrong
+                DOM.opts[optIndex].classList.add('wrong');
+                DOM.opts[optIndex].disabled = true; // Disable that wrong button
+            }
+        };
+
+        function updateOpponentUI() {
+            DOM.oppScoreText.innerText = `${state.oppScore}/10`;
+            DOM.oppProgress.style.width = `${(state.oppScore / 10) * 100}%`;
+        }
+
+        // --- 5. END SCREENS ---
+        function showWinnerScreen(time) {
+            DOM.game.style.display = 'none';
+            DOM.endScreen.style.display = 'block';
+            DOM.winnerText.innerText = "🏆 දිනුම්!";
+            DOM.winnerText.style.color = "var(--success)";
+            DOM.endMsg.innerText = "නියමයි! ඔයා තමයි මුලින්ම ගණන් 10 හැදුවේ.";
+            DOM.finalTime.innerText = `ගතවූ කාලය: ${time}`;
+        }
+
+        function showLoserScreen(winnerName, time) {
+            state.isGameOver = true;
+            clearInterval(state.timerInterval);
+            
+            DOM.game.style.display = 'none';
+            DOM.endScreen.style.display = 'block';
+            DOM.winnerText.innerText = "😢 පරාදයි!";
+            DOM.winnerText.style.color = "var(--danger)";
+            
+            let nameDisplay = winnerName === 'sumudu' ? 'සුමුදු' : 'සසින්දි';
+            DOM.endMsg.innerText = `${nameDisplay} ඔයාට කලින් ගණන් 10 හදලා ඉවර කළා.`;
+            DOM.finalTime.innerText = `අනිත් කෙනාගේ කාලය: ${time}`;
+        }
+
+    </script>
+</body>
+</html>
